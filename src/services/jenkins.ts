@@ -185,6 +185,27 @@ export class JenkinsService {
     }
   }
 
+  /**
+   * Get last build summary: number, result, timestamp, duration.
+   * Returns null if no build exists.
+   */
+  async getLastBuildSummary(jobName: string): Promise<BuildStatus | null> {
+    try {
+      const data = await this.getJson<any>(`/job/${encodeURIComponent(jobName)}/lastBuild/api/json`);
+      if (!data) return null;
+      return {
+        number: data.number,
+        result: data.result,
+        building: data.building,
+        url: data.url,
+        timestamp: data.timestamp,
+        duration: data.duration,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   // ── XML Parsing ─────────────────────────────────────────────────
 
   /**

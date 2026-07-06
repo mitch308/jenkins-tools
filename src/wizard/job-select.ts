@@ -1,6 +1,7 @@
 import type { AppConfig } from '../config/schema.js';
-import type { JenkinsService } from '../services/jenkins.js';
+import type { JenkinsService, BuildStatus } from '../services/jenkins.js';
 import { select, input } from '../utils/prompt.js';
+import chalk from 'chalk';
 
 export interface JobSelection {
   jobName: string;       // Jenkins job 路径，如 "frontend/deploy-main"
@@ -8,9 +9,24 @@ export interface JobSelection {
   serverProfile: string; // 使用的服务器 profile 名
 }
 
+function formatBuildSummary(build: BuildStatus | null): string {
+  if (!build) return chalk.gray('无构建记录');
+  if (build.building) {
+    const elapsed = Math.round((Date.now() - build.timestamp) / 1000);
+    return chalk.yellow(`⏳ #${build.number} 构建中 (${elapsed}s)`);
+  }
+  const time = new Date(build.timestamp).toLocaleString('zh-CN');
+  const duration = Math.round(build.duration / 1000);
+  const icon = build.result === 'SUCCESS' ? chalk.green('✔')
+    : build.result === 'FAILURE' ? chalk.red('✖')
+    : build.result === 'ABORTED' ? chalk.gray('⊘')
+    : chalk.blue('ℹ');
+  return `${icon} #${build.number} ${build.result || '未知'} ${time} (${duration}s)`;
+}
+
 export async function runJobSelectWizard(
   config: AppConfig,
-  _service: JenkinsService,
+  service: JenkinsService,
   preselectedJob?: string,
 ): Promise<JobSelection> {
   // 如果通过 --job 参数预选了任务
@@ -43,8 +59,18 @@ export async function runJobSelectWizard(
     };
   }
 
+  // 并行查询所有 Job 的最近构建状态
+  const summaries = await Promise.all(
+    jobKeys.map(async (key) => {
+      const build = await service.getLastBuildSummary(jobs[key].name);
+      return { key, build };
+    }),
+  );
+
+  const summaryMap = new Map(summaries.map((s) => [s.key, s.build]));
+
   const choices = jobKeys.map((key) => ({
-    name: `${key} (${jobs[key].name}) [${jobs[key].server}]`,
+    name: `${key} (${jobs[key].name}) [${jobs[key].server}] ${formatBuildSummary(summaryMap.get(key) ?? null)}`,
     value: key,
   }));
   choices.push({ name: '手动输入任务名称', value: '__manual__' });
