@@ -51,7 +51,7 @@ export async function runParamsWizard(
       // 选择类型参数
       const { value } = await inquirer.prompt([
         {
-          type: 'list',
+          type: 'select',
           name: 'value',
           message: `${param.name}${hint}:`,
           choices: param.choices.map((c) => ({

@@ -15,7 +15,7 @@ export async function confirm(message: string, defaultValue = false): Promise<bo
 export async function select<T = string>(message: string, choices: Array<{ name: string; value: T }>): Promise<T> {
   const { result } = await inquirer.prompt([
     {
-      type: 'list',
+      type: 'select',
       name: 'result',
       message,
       choices,
