@@ -1,9 +1,4 @@
 declare module 'jenkins-api' {
-  interface JenkinsApiOptions {
-    baseUrl: string;
-    headers?: Record<string, string>;
-  }
-
   interface JenkinsApi {
     all_jobs(callback: (err: Error | null, data?: any) => void): void;
     job_info(jobName: string, callback: (err: Error | null, data?: any) => void): void;
@@ -15,7 +10,7 @@ declare module 'jenkins-api' {
   }
 
   const jenkinsApi: {
-    init(options: JenkinsApiOptions): JenkinsApi;
+    init(url: string): JenkinsApi;
   };
   export = jenkinsApi;
 }

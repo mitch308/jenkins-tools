@@ -27,20 +27,19 @@ export class JenkinsService {
 
   constructor(private profile: ServerProfile) {
     const baseUrl = profile.url.replace(/\/+$/, '');
-    const auth = profile.token
-      ? Buffer.from(`${profile.username}:${profile.token}`).toString('base64')
-      : Buffer.from(`${profile.username}:${profile.password}`).toString('base64');
 
     if (!profile.token && !profile.password) {
       throw new Error('Either token or password must be provided for authentication');
     }
 
-    this.client = jenkinsApi.init({
-      baseUrl,
-      headers: {
-        Authorization: `Basic ${auth}`,
-      },
-    });
+    // jenkins-api init() only accepts a URL string with embedded credentials
+    const secret = profile.token || profile.password!;
+    const authUrl = baseUrl.replace(
+      /^(https?:\/\/)/,
+      `$1${encodeURIComponent(profile.username)}:${encodeURIComponent(secret)}@`,
+    );
+
+    this.client = jenkinsApi.init(authUrl);
   }
 
   async testConnection(): Promise<boolean> {
