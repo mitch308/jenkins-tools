@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Suppress deprecation warnings from transitive dependencies (punycode via jenkins-api → request)
+process.removeAllListeners('warning');
+
 import { Command } from 'commander';
 import { registerRunCommand } from './commands/run.js';
 import { registerBuildCommand } from './commands/build.js';
