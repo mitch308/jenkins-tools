@@ -111,6 +111,14 @@ export class JenkinsService {
     }
   }
 
+  /**
+   * Get all job names from Jenkins.
+   */
+  async getJobNames(): Promise<string[]> {
+    const data = await this.getJson<any>('/api/json?tree=jobs[name]');
+    return (data.jobs || []).map((j: any) => j.name);
+  }
+
   async getJobInfo(jobName: string): Promise<JobInfo> {
     // 1. Get basic job info from JSON API
     const data = await this.getJson<any>(`/job/${encodeURIComponent(jobName)}/api/json`);
