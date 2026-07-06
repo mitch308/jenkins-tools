@@ -188,9 +188,7 @@ export class JenkinsService {
   // ── XML Parsing ─────────────────────────────────────────────────
 
   /**
-   * Parse parameter definitions from config.xml.
-   * Handles standard params and uno-choice plugin's ChoiceParameter
-   * (which stores choices in a Groovy script element).
+   * Parse parameter definitions from config.xml, preserving XML order.
    */
   private parseParamsFromXml(xml: string): JobParamDef[] {
     const params: JobParamDef[] = [];
@@ -201,68 +199,60 @@ export class JenkinsService {
 
     const pdBlock = pdMatch[1];
 
-    // Parse StringParameterDefinition
-    const stringRegex = /<hudson\.model\.StringParameterDefinition>([\s\S]*?)<\/hudson\.model\.StringParameterDefinition>/g;
+    // Split into individual parameter blocks by matching each top-level tag
+    // in the order they appear in the XML
+    const paramTagPattern = /<(hudson\.model\.StringParameterDefinition|hudson\.model\.BooleanParameterDefinition|hudson\.model\.ChoiceParameterDefinition|org\.biouno\.unochoice\.ChoiceParameter)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/g;
+
     let match;
-    while ((match = stringRegex.exec(pdBlock)) !== null) {
-      const block = match[1];
-      params.push({
-        name: this.extractXmlValue(block, 'name') || '',
-        type: 'StringParameterDefinition',
-        default: this.extractXmlValue(block, 'defaultValue'),
-        description: this.extractXmlValue(block, 'description'),
-      });
-    }
+    while ((match = paramTagPattern.exec(pdBlock)) !== null) {
+      const tag = match[1];
+      const inner = match[2];
 
-    // Parse BooleanParameterDefinition
-    const boolRegex = /<hudson\.model\.BooleanParameterDefinition>([\s\S]*?)<\/hudson\.model\.BooleanParameterDefinition>/g;
-    while ((match = boolRegex.exec(pdBlock)) !== null) {
-      const block = match[1];
-      params.push({
-        name: this.extractXmlValue(block, 'name') || '',
-        type: 'BooleanParameterDefinition',
-        default: this.extractXmlValue(block, 'defaultValue'),
-        description: this.extractXmlValue(block, 'description'),
-      });
-    }
+      if (tag.startsWith('hudson.model.StringParameterDefinition')) {
+        const inner = match[2];
+        params.push({
+          name: this.extractXmlValue(inner, 'name') || '',
+          type: 'StringParameterDefinition',
+          default: this.extractXmlValue(inner, 'defaultValue'),
+          description: this.extractXmlValue(inner, 'description'),
+        });
+      } else if (tag.startsWith('hudson.model.BooleanParameterDefinition')) {
+        const inner = match[2];
+        params.push({
+          name: this.extractXmlValue(inner, 'name') || '',
+          type: 'BooleanParameterDefinition',
+          default: this.extractXmlValue(inner, 'defaultValue'),
+          description: this.extractXmlValue(inner, 'description'),
+        });
+      } else if (tag.startsWith('hudson.model.ChoiceParameterDefinition')) {
+        const inner = match[2];
+        const choices: string[] = [];
+        const choiceItemRegex = /<string>([^<]+)<\/string>/g;
+        let choiceMatch;
+        while ((choiceMatch = choiceItemRegex.exec(inner)) !== null) {
+          choices.push(choiceMatch[1]);
+        }
+        params.push({
+          name: this.extractXmlValue(inner, 'name') || '',
+          type: 'ChoiceParameterDefinition',
+          default: choices[0],
+          description: this.extractXmlValue(inner, 'description'),
+          choices,
+        });
+      } else if (tag.startsWith('org.biouno.unochoice.ChoiceParameter')) {
+        const name = this.extractXmlValue(inner, 'name') || '';
+        const description = this.extractXmlValue(inner, 'description');
+        const choiceType = this.extractXmlValue(inner, 'choiceType') || 'PT_RADIO';
+        const choices = this.parseUnoChoiceScript(inner);
 
-    // Parse ChoiceParameter (uno-choice plugin)
-    const choiceRegex = /<org\.biouno\.unochoice\.ChoiceParameter[\s>][\s\S]*?<\/org\.biouno\.unochoice\.ChoiceParameter>/g;
-    while ((match = choiceRegex.exec(pdBlock)) !== null) {
-      const block = match[0];
-      const name = this.extractXmlValue(block, 'name') || '';
-      const description = this.extractXmlValue(block, 'description');
-      const choiceType = this.extractXmlValue(block, 'choiceType') || 'PT_RADIO';
-      const choices = this.parseUnoChoiceScript(block);
-
-      params.push({
-        name,
-        type: `ChoiceParameter:${choiceType}`,
-        default: choices.find((c) => c.includes(':selected'))?.replace(':selected', '') || choices[0],
-        description,
-        choices: choices.map((c) => c.replace(':selected', '')),
-      });
-    }
-
-    // Parse standard hudson.model.ChoiceParameterDefinition
-    const stdChoiceRegex = /<hudson\.model\.ChoiceParameterDefinition>([\s\S]*?)<\/hudson\.model\.ChoiceParameterDefinition>/g;
-    while ((match = stdChoiceRegex.exec(pdBlock)) !== null) {
-      const block = match[1];
-      const name = this.extractXmlValue(block, 'name') || '';
-      const description = this.extractXmlValue(block, 'description');
-      const choices: string[] = [];
-      const choiceRegex2 = /<string>([^<]+)<\/string>/g;
-      let choiceMatch;
-      while ((choiceMatch = choiceRegex2.exec(block)) !== null) {
-        choices.push(choiceMatch[1]);
+        params.push({
+          name,
+          type: `ChoiceParameter:${choiceType}`,
+          default: choices.find((c) => c.includes(':selected'))?.replace(':selected', '') || choices[0],
+          description,
+          choices: choices.map((c) => c.replace(':selected', '')),
+        });
       }
-      params.push({
-        name,
-        type: 'ChoiceParameterDefinition',
-        default: choices[0],
-        description,
-        choices,
-      });
     }
 
     return params;

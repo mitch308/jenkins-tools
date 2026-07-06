@@ -2,8 +2,7 @@ import type { JenkinsService } from '../services/jenkins.js';
 import type { AppConfig, JobParamDef } from '../config/schema.js';
 import { loadHistory, saveHistory } from '../config/store.js';
 import { spinner, printInfo, printWarning } from '../utils/output.js';
-import { input, confirm } from '../utils/prompt.js';
-import inquirer from 'inquirer';
+import { input, confirm, select } from '../utils/prompt.js';
 
 export async function runParamsWizard(
   service: JenkinsService,
@@ -48,30 +47,15 @@ export async function runParamsWizard(
     const hint = param.description ? ` - ${param.description}` : '';
 
     if (param.choices && param.choices.length > 0) {
-      // 选择类型参数
-      const { value } = await inquirer.prompt([
-        {
-          type: 'select',
-          name: 'value',
-          message: `${param.name}${hint}:`,
-          choices: param.choices.map((c) => ({
-            name: c,
-            value: c,
-          })),
-          default: currentValue,
-        },
-      ]);
+      // 选择类型参数（ChoiceParameter / ChoiceParameterDefinition）
+      const value = await select(`${param.name}${hint}:`, param.choices.map((c) => ({
+        name: c,
+        value: c,
+      })));
       finalParams[param.name] = value;
     } else if (param.type === 'BooleanParameterDefinition') {
       // 布尔类型参数
-      const { value } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'value',
-          message: `${param.name}${hint}:`,
-          default: currentValue === 'true',
-        },
-      ]);
+      const value = await confirm(`${param.name}${hint}:`, currentValue === 'true');
       finalParams[param.name] = value.toString();
     } else {
       // 字符串/文本类型参数
