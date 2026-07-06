@@ -12,13 +12,14 @@ export async function confirm(message: string, defaultValue = false): Promise<bo
   return result;
 }
 
-export async function select<T = string>(message: string, choices: Array<{ name: string; value: T }>): Promise<T> {
+export async function select<T = string>(message: string, choices: Array<{ name: string; value: T }>, defaultValue?: T): Promise<T> {
   const { result } = await inquirer.prompt([
     {
       type: 'select',
       name: 'result',
       message,
       choices,
+      default: defaultValue,
     },
   ]);
   return result;

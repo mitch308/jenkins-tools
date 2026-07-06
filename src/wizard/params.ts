@@ -51,7 +51,7 @@ export async function runParamsWizard(
       const value = await select(`${param.name}${hint}:`, param.choices.map((c) => ({
         name: c,
         value: c,
-      })));
+      })), currentValue);
       finalParams[param.name] = value;
     } else if (param.type === 'BooleanParameterDefinition') {
       // 布尔类型参数
