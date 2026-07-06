@@ -28,6 +28,10 @@ export interface HistoryEntry {
 
 export type HistoryData = Record<string, HistoryEntry>;
 
+export interface HistoryMeta {
+  lastJob?: string;
+}
+
 export interface JobParamDef {
   name: string;
   type: string;

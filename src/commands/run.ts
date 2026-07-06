@@ -18,7 +18,7 @@ export function registerRunCommand(program: Command): void {
         const { config, service, profileName } = await runAuthWizard(cwd);
 
         // Step 2: 选择任务
-        const selection = await runJobSelectWizard(config, service, options.job);
+        const selection = await runJobSelectWizard(config, service, options.job, cwd);
 
         // Step 3: 配置参数
         const params = await runParamsWizard(service, selection.jobName, config, cwd, selection.jobAlias);
