@@ -1,0 +1,23 @@
+# Jenkins CLI 工具配置文件示例
+# 复制为 .jenkinsrc.yml 并修改
+
+servers:
+  default: production
+  profiles:
+    production:
+      url: https://jenkins.example.com
+      username: your-user
+      token: your-api-token
+    staging:
+      url: https://staging-jenkins.example.com
+      username: your-user
+      password: your-password
+
+jobs:
+  # frontend-deploy 是任务别名，用于 CLI 中快速引用
+  frontend-deploy:
+    server: production
+    name: frontend/deploy-main
+  backend-test:
+    server: staging
+    name: backend/run-tests
