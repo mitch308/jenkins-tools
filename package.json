@@ -1,0 +1,33 @@
+{
+  "name": "jenkins-tools",
+  "version": "0.1.0",
+  "description": "Interactive Jenkins CLI tool with step-by-step build configuration",
+  "type": "module",
+  "bin": {
+    "jkt": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "jenkins",
+    "cli"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^15.0.0",
+    "inquirer": "^14.0.2",
+    "jenkins-api": "^0.3.1",
+    "js-yaml": "^5.2.1",
+    "ora": "^9.4.1"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.10",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3"
+  }
+}
