@@ -1,4 +1,4 @@
-import jenkins from 'jenkins-api';
+import jenkinsApi from 'jenkins-api';
 import type { ServerProfile, JobParamDef } from '../config/schema.js';
 
 export interface JobInfo {
@@ -23,7 +23,7 @@ export interface BuildStatus {
 }
 
 export class JenkinsService {
-  private client: ReturnType<typeof jenkins>;
+  private client: ReturnType<typeof jenkinsApi.init>;
 
   constructor(private profile: ServerProfile) {
     const baseUrl = profile.url.replace(/\/+$/, '');
@@ -35,7 +35,7 @@ export class JenkinsService {
       throw new Error('Either token or password must be provided for authentication');
     }
 
-    this.client = jenkins({
+    this.client = jenkinsApi.init({
       baseUrl,
       headers: {
         Authorization: `Basic ${auth}`,

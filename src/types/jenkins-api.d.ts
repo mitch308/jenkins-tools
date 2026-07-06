@@ -14,6 +14,8 @@ declare module 'jenkins-api' {
     console_output(jobName: string, buildNumber: number, callback: (err: Error | null, data?: any) => void): void;
   }
 
-  function jenkins(options: JenkinsApiOptions): JenkinsApi;
-  export = jenkins;
+  const jenkinsApi: {
+    init(options: JenkinsApiOptions): JenkinsApi;
+  };
+  export = jenkinsApi;
 }
