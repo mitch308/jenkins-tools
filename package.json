@@ -20,7 +20,6 @@
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
     "inquirer": "^14.0.2",
-    "jenkins-api": "^0.3.1",
     "js-yaml": "^5.2.1",
     "ora": "^9.4.1"
   },

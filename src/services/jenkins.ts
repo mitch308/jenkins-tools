@@ -1,4 +1,3 @@
-import jenkinsApi from 'jenkins-api';
 import http from 'node:http';
 import https from 'node:https';
 import type { ServerProfile, JobParamDef } from '../config/schema.js';
@@ -25,197 +24,306 @@ export interface BuildStatus {
 }
 
 export class JenkinsService {
-  private client: ReturnType<typeof jenkinsApi.init>;
-  private authUrl: string;
+  private baseUrl: string;
+  private authHeader: string;
 
   constructor(private profile: ServerProfile) {
-    const baseUrl = profile.url.replace(/\/+$/, '');
+    this.baseUrl = profile.url.replace(/\/+$/, '');
 
     if (!profile.token && !profile.password) {
       throw new Error('Either token or password must be provided for authentication');
     }
 
-    // jenkins-api init() only accepts a URL string with embedded credentials
     const secret = profile.token || profile.password!;
-    this.authUrl = baseUrl.replace(
-      /^(https?:\/\/)/,
-      `$1${encodeURIComponent(profile.username)}:${encodeURIComponent(secret)}@`,
-    );
-
-    this.client = jenkinsApi.init(this.authUrl);
+    this.authHeader = 'Basic ' + Buffer.from(`${profile.username}:${secret}`).toString('base64');
   }
 
-  async testConnection(): Promise<boolean> {
-    return new Promise((resolve) => {
-      this.client.all_jobs((err: Error | null) => {
-        resolve(!err);
+  // ── Low-level HTTP helpers ──────────────────────────────────────
+
+  private async request(path: string, options?: { method?: string; body?: string; contentType?: string }): Promise<{ statusCode: number; headers: Record<string, string | string[] | undefined>; body: string }> {
+    const url = new URL(path, this.baseUrl);
+    const lib = url.protocol === 'https:' ? https : http;
+
+    return new Promise((resolve, reject) => {
+      const req = lib.request(url, {
+        method: options?.method || 'GET',
+        headers: {
+          Authorization: this.authHeader,
+          ...(options?.contentType ? { 'Content-Type': options.contentType } : {}),
+        },
+      }, (res) => {
+        // Follow redirects
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const redirectUrl = new URL(res.headers.location, this.baseUrl).toString();
+          const redirectLib = redirectUrl.startsWith('https') ? https : http;
+          redirectLib.get(redirectUrl, { headers: { Authorization: this.authHeader } }, (redirectRes) => {
+            let body = '';
+            redirectRes.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            redirectRes.on('end', () => resolve({ statusCode: redirectRes.statusCode || 0, headers: redirectRes.headers as any, body }));
+            redirectRes.on('error', reject);
+          }).on('error', reject);
+          return;
+        }
+
+        let body = '';
+        res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        res.on('end', () => resolve({ statusCode: res.statusCode || 0, headers: res.headers as any, body }));
+        res.on('error', reject);
       });
+
+      req.on('error', reject);
+      if (options?.body) {
+        req.write(options.body);
+      }
+      req.end();
     });
+  }
+
+  private async getJson<T>(path: string): Promise<T> {
+    const { statusCode, body } = await this.request(path);
+    if (statusCode >= 400) {
+      throw new Error(`Jenkins API error: HTTP ${statusCode} for ${path}`);
+    }
+    return JSON.parse(body) as T;
+  }
+
+  private async getXml(path: string): Promise<string> {
+    const { statusCode, body } = await this.request(path);
+    if (statusCode >= 400) {
+      throw new Error(`Jenkins API error: HTTP ${statusCode} for ${path}`);
+    }
+    return body;
+  }
+
+  private async post(path: string, body?: string, contentType?: string): Promise<{ statusCode: number; headers: Record<string, string | string[] | undefined> }> {
+    const result = await this.request(path, { method: 'POST', body, contentType });
+    return { statusCode: result.statusCode, headers: result.headers };
+  }
+
+  // ── Public API ──────────────────────────────────────────────────
+
+  async testConnection(): Promise<boolean> {
+    try {
+      const { statusCode } = await this.request('/api/json');
+      return statusCode === 200;
+    } catch {
+      return false;
+    }
   }
 
   async getJobInfo(jobName: string): Promise<JobInfo> {
-    return new Promise((resolve, reject) => {
-      this.client.job_info(jobName, async (err: Error | null, data: any) => {
-        if (err) {
-          reject(new Error(`Failed to get job info for "${jobName}": ${err.message}`));
-          return;
-        }
-        const params: JobParamDef[] = [];
-        const property = data.property?.find((p: any) => p.parameterDefinitions);
-        if (property?.parameterDefinitions) {
-          // Check if any ChoiceParameter exists (uno-choice plugin) — need HTML scraping
-          const hasChoiceParam = property.parameterDefinitions.some(
-            (p: any) => p.type === 'ChoiceParameter' && !p.choices,
-          );
+    // 1. Get basic job info from JSON API
+    const data = await this.getJson<any>(`/job/${encodeURIComponent(jobName)}/api/json`);
 
-          let htmlChoices: Record<string, string[]> = {};
-          if (hasChoiceParam) {
-            try {
-              htmlChoices = await this.fetchChoiceParamsFromHtml(jobName);
-            } catch {
-              // If HTML scraping fails, continue without choices
-            }
-          }
-
-          for (const param of property.parameterDefinitions) {
-            const choices = param.choices || htmlChoices[param.name] || undefined;
-            params.push({
-              name: param.name,
-              type: param.type || 'StringParameterDefinition',
-              default: param.defaultParameterValue?.value?.toString(),
-              description: param.description,
-              choices,
-            });
-          }
-        }
-        resolve({
-          name: data.name,
-          url: data.url,
-          params,
-          buildable: data.buildable ?? true,
-        });
-      });
-    });
-  }
-
-  /**
-   * Fetch choice parameter options from the build form HTML page.
-   * The uno-choice plugin's ChoiceParameter does not expose choices via the JSON API,
-   * so we parse them from the HTML form at /job/<name>/build.
-   */
-  private async fetchChoiceParamsFromHtml(jobName: string): Promise<Record<string, string[]>> {
-    const url = `${this.authUrl}/job/${encodeURIComponent(jobName)}/build`;
-    const html = await this.httpGet(url);
-    const result: Record<string, string[]> = {};
-
-    // Find all radio/checkbox inputs grouped by name attribute
-    // Pattern: name="PARAM_NAME" ... value="option_value"
-    const radioRegex = /name="([^"]+)"[^>]*type="radio"[^>]*value="([^"]+)"/g;
-    let match;
-    while ((match = radioRegex.exec(html)) !== null) {
-      const [, paramName, value] = match;
-      if (!result[paramName]) {
-        result[paramName] = [];
-      }
-      result[paramName].push(value);
+    // 2. Get config.xml for full parameter definitions (including uno-choice)
+    let configParams: JobParamDef[] = [];
+    try {
+      const xml = await this.getXml(`/job/${encodeURIComponent(jobName)}/config.xml`);
+      configParams = this.parseParamsFromXml(xml);
+    } catch {
+      // Fallback: extract from JSON API if config.xml fails
+      configParams = this.parseParamsFromJson(data);
     }
 
-    // Also try select/option elements
-    const selectRegex = /<select[^>]*name="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g;
-    const optionRegex = /<option[^>]*value="([^"]*)"[^>]*>/g;
-    let selectMatch;
-    while ((selectMatch = selectRegex.exec(html)) !== null) {
-      const [, paramName, optionsHtml] = selectMatch;
-      if (!result[paramName]) {
-        result[paramName] = [];
-      }
-      let optionMatch;
-      const optionRegex2 = new RegExp(optionRegex.source, 'g');
-      while ((optionMatch = optionRegex2.exec(optionsHtml)) !== null) {
-        result[paramName].push(optionMatch[1]);
-      }
-    }
-
-    return result;
-  }
-
-  private httpGet(url: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const parsed = new URL(url);
-      const lib = parsed.protocol === 'https:' ? https : http;
-      lib.get(url, { headers: { Accept: 'text/html' } }, (res) => {
-        // Follow redirects
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          this.httpGet(res.headers.location).then(resolve).catch(reject);
-          return;
-        }
-        let body = '';
-        res.on('data', (chunk) => { body += chunk; });
-        res.on('end', () => resolve(body));
-        res.on('error', reject);
-      }).on('error', reject);
-    });
+    return {
+      name: data.name,
+      url: data.url,
+      params: configParams,
+      buildable: data.buildable ?? true,
+    };
   }
 
   async build(jobName: string, params?: Record<string, string>): Promise<BuildResult> {
-    return new Promise((resolve, reject) => {
-      const callback = (err: Error | null, data: any) => {
-        if (err) {
-          reject(new Error(`Failed to trigger build for "${jobName}": ${err.message}`));
-          return;
-        }
-        resolve({
-          queueUrl: data?.location || '',
-        });
-      };
-      if (params && Object.keys(params).length > 0) {
-        this.client.build_with_params(jobName, params, callback);
-      } else {
-        this.client.build(jobName, callback);
-      }
-    });
+    const jobPath = `/job/${encodeURIComponent(jobName)}`;
+
+    let result;
+    if (params && Object.keys(params).length > 0) {
+      const formBody = Object.entries(params)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join('&');
+      result = await this.post(`${jobPath}/buildWithParameters`, formBody, 'application/x-www-form-urlencoded');
+    } else {
+      result = await this.post(`${jobPath}/build`);
+    }
+
+    if (result.statusCode >= 400) {
+      throw new Error(`Failed to trigger build for "${jobName}": HTTP ${result.statusCode}`);
+    }
+
+    const queueUrl = typeof result.headers.location === 'string'
+      ? result.headers.location
+      : Array.isArray(result.headers.location)
+        ? result.headers.location[0]
+        : '';
+
+    return { queueUrl };
   }
 
   async getBuildStatus(jobName: string, buildNumber: number): Promise<BuildStatus> {
-    return new Promise((resolve, reject) => {
-      this.client.build_info(jobName, buildNumber, (err: Error | null, data: any) => {
-        if (err) {
-          reject(new Error(`Failed to get build status: ${err.message}`));
-          return;
-        }
-        resolve({
-          number: data.number,
-          result: data.result,
-          building: data.building,
-          url: data.url,
-          timestamp: data.timestamp,
-          duration: data.duration,
-        });
-      });
-    });
+    const data = await this.getJson<any>(`/job/${encodeURIComponent(jobName)}/${buildNumber}/api/json`);
+    return {
+      number: data.number,
+      result: data.result,
+      building: data.building,
+      url: data.url,
+      timestamp: data.timestamp,
+      duration: data.duration,
+    };
   }
 
   async getBuildLog(jobName: string, buildNumber: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-      this.client.console_output(jobName, buildNumber, (err: Error | null, data: any) => {
-        if (err) {
-          reject(new Error(`Failed to get build log: ${err.message}`));
-          return;
-        }
-        resolve(data || '');
-      });
-    });
+    const { body } = await this.request(`/job/${encodeURIComponent(jobName)}/${buildNumber}/consoleText`);
+    return body;
   }
 
   async getLastBuildNumber(jobName: string): Promise<number> {
-    return new Promise((resolve, reject) => {
-      this.client.last_build_info(jobName, (err: Error | null, data: any) => {
-        if (err) {
-          reject(new Error(`Failed to get last build number: ${err.message}`));
-          return;
-        }
-        resolve(data?.number || 0);
+    try {
+      const data = await this.getJson<any>(`/job/${encodeURIComponent(jobName)}/lastBuild/api/json`);
+      return data?.number || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  // ── XML Parsing ─────────────────────────────────────────────────
+
+  /**
+   * Parse parameter definitions from config.xml.
+   * Handles standard params and uno-choice plugin's ChoiceParameter
+   * (which stores choices in a Groovy script element).
+   */
+  private parseParamsFromXml(xml: string): JobParamDef[] {
+    const params: JobParamDef[] = [];
+
+    // Extract the <parameterDefinitions> block
+    const pdMatch = xml.match(/<parameterDefinitions>([\s\S]*?)<\/parameterDefinitions>/);
+    if (!pdMatch) return params;
+
+    const pdBlock = pdMatch[1];
+
+    // Parse StringParameterDefinition
+    const stringRegex = /<hudson\.model\.StringParameterDefinition>([\s\S]*?)<\/hudson\.model\.StringParameterDefinition>/g;
+    let match;
+    while ((match = stringRegex.exec(pdBlock)) !== null) {
+      const block = match[1];
+      params.push({
+        name: this.extractXmlValue(block, 'name') || '',
+        type: 'StringParameterDefinition',
+        default: this.extractXmlValue(block, 'defaultValue'),
+        description: this.extractXmlValue(block, 'description'),
       });
-    });
+    }
+
+    // Parse BooleanParameterDefinition
+    const boolRegex = /<hudson\.model\.BooleanParameterDefinition>([\s\S]*?)<\/hudson\.model\.BooleanParameterDefinition>/g;
+    while ((match = boolRegex.exec(pdBlock)) !== null) {
+      const block = match[1];
+      params.push({
+        name: this.extractXmlValue(block, 'name') || '',
+        type: 'BooleanParameterDefinition',
+        default: this.extractXmlValue(block, 'defaultValue'),
+        description: this.extractXmlValue(block, 'description'),
+      });
+    }
+
+    // Parse ChoiceParameter (uno-choice plugin)
+    const choiceRegex = /<org\.biouno\.unochoice\.ChoiceParameter[\s>][\s\S]*?<\/org\.biouno\.unochoice\.ChoiceParameter>/g;
+    while ((match = choiceRegex.exec(pdBlock)) !== null) {
+      const block = match[0];
+      const name = this.extractXmlValue(block, 'name') || '';
+      const description = this.extractXmlValue(block, 'description');
+      const choiceType = this.extractXmlValue(block, 'choiceType') || 'PT_RADIO';
+      const choices = this.parseUnoChoiceScript(block);
+
+      params.push({
+        name,
+        type: `ChoiceParameter:${choiceType}`,
+        default: choices.find((c) => c.includes(':selected'))?.replace(':selected', '') || choices[0],
+        description,
+        choices: choices.map((c) => c.replace(':selected', '')),
+      });
+    }
+
+    // Parse standard hudson.model.ChoiceParameterDefinition
+    const stdChoiceRegex = /<hudson\.model\.ChoiceParameterDefinition>([\s\S]*?)<\/hudson\.model\.ChoiceParameterDefinition>/g;
+    while ((match = stdChoiceRegex.exec(pdBlock)) !== null) {
+      const block = match[1];
+      const name = this.extractXmlValue(block, 'name') || '';
+      const description = this.extractXmlValue(block, 'description');
+      const choices: string[] = [];
+      const choiceRegex2 = /<string>([^<]+)<\/string>/g;
+      let choiceMatch;
+      while ((choiceMatch = choiceRegex2.exec(block)) !== null) {
+        choices.push(choiceMatch[1]);
+      }
+      params.push({
+        name,
+        type: 'ChoiceParameterDefinition',
+        default: choices[0],
+        description,
+        choices,
+      });
+    }
+
+    return params;
+  }
+
+  /**
+   * Parse uno-choice Groovy script to extract choice options.
+   * Script format: return ['option1:selected', 'option2', ...]
+   */
+  private parseUnoChoiceScript(block: string): string[] {
+    // Find the <script> content inside <secureScript>
+    const scriptMatch = block.match(/<secureScript[^>]*>[\s\S]*?<script>([\s\S]*?)<\/script>/);
+    if (!scriptMatch) return [];
+
+    // Decode XML entities (&apos; → ', &quot; → ", &amp; → &, etc.)
+    const script = scriptMatch[1]
+      .replace(/&apos;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+
+    // Match Groovy list literal: return ['val1', 'val2', ...]
+    const listMatch = script.match(/return\s*\[([\s\S]*?)\]/);
+    if (!listMatch) return [];
+
+    const listContent = listMatch[1];
+
+    // Extract quoted strings
+    const items: string[] = [];
+    const itemRegex = /'([^']*)'/g;
+    let itemMatch;
+    while ((itemMatch = itemRegex.exec(listContent)) !== null) {
+      items.push(itemMatch[1]);
+    }
+
+    return items;
+  }
+
+  /**
+   * Fallback: parse params from JSON API response.
+   */
+  private parseParamsFromJson(data: any): JobParamDef[] {
+    const params: JobParamDef[] = [];
+    const property = data.property?.find((p: any) => p.parameterDefinitions);
+    if (!property?.parameterDefinitions) return params;
+
+    for (const param of property.parameterDefinitions) {
+      params.push({
+        name: param.name,
+        type: param.type || 'StringParameterDefinition',
+        default: param.defaultParameterValue?.value?.toString(),
+        description: param.description,
+        choices: param.choices,
+      });
+    }
+    return params;
+  }
+
+  private extractXmlValue(block: string, tag: string): string | undefined {
+    const match = block.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
+    return match ? match[1] : undefined;
   }
 }
