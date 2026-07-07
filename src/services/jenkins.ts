@@ -215,6 +215,32 @@ export class JenkinsService {
     };
   }
 
+  /**
+   * Abort a running build.
+   */
+  async abortBuild(jobName: string, buildNumber: number): Promise<void> {
+    const { statusCode } = await this.request(
+      `/job/${encodeURIComponent(jobName)}/${buildNumber}/stop`,
+      { method: 'POST' },
+    );
+    if (statusCode >= 400) {
+      throw new Error(`Failed to abort build #${buildNumber}: HTTP ${statusCode}`);
+    }
+  }
+
+  /**
+   * Delete a build record from Jenkins.
+   */
+  async deleteBuild(jobName: string, buildNumber: number): Promise<void> {
+    const { statusCode } = await this.request(
+      `/job/${encodeURIComponent(jobName)}/${buildNumber}/doDelete`,
+      { method: 'POST' },
+    );
+    if (statusCode >= 400) {
+      throw new Error(`Failed to delete build #${buildNumber}: HTTP ${statusCode}`);
+    }
+  }
+
   async getBuildLog(jobName: string, buildNumber: number): Promise<string> {
     const { body } = await this.request(`/job/${encodeURIComponent(jobName)}/${buildNumber}/consoleText`);
     return body;

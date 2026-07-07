@@ -7,6 +7,7 @@ import { Command } from 'commander';
 import { registerRunCommand } from './commands/run.js';
 import { registerBuildCommand } from './commands/build.js';
 import { registerStatusCommand } from './commands/status.js';
+import { registerAbortCommand } from './commands/abort.js';
 import { registerConfigCommand } from './commands/config.js';
 
 const program = new Command();
@@ -43,6 +44,7 @@ program.action(async () => {
 registerRunCommand(program);
 registerBuildCommand(program);
 registerStatusCommand(program);
+registerAbortCommand(program);
 registerConfigCommand(program);
 
 program.parse();
