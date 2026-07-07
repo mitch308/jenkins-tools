@@ -34,6 +34,9 @@ export interface BuildSummary {
   description?: string;
   userId?: string;
   userName?: string;
+  queued?: boolean;
+  queueId?: number;
+  queueWhy?: string;
 }
 
 export interface QueueItemInfo {
@@ -367,45 +370,89 @@ export class JenkinsService {
   }
 
   /**
-   * Get recent build list for a job.
+   * Get recent build list for a job, including queued items.
    * Returns build summaries in reverse chronological order (newest first).
+   * Queued items appear at the top with queued=true.
    */
   async getRecentBuilds(jobName: string, limit: number = 10): Promise<BuildSummary[]> {
+    // 1. Get queued items for this job
+    let queuedItems: BuildSummary[] = [];
+    try {
+      const queueData = await this.getJson<any>('/queue/api/json');
+      const items = queueData.items || [];
+      for (const item of items) {
+        if (item.task?.name === jobName && !item.cancelled) {
+          // Extract trigger user from actions.causes
+          let userName: string | undefined;
+          for (const action of item.actions || []) {
+            for (const cause of action.causes || []) {
+              if (cause.userName) {
+                userName = cause.userName;
+                break;
+              }
+            }
+            if (userName) break;
+          }
+          queuedItems.push({
+            number: item.executable?.number ?? 0,
+            result: null,
+            building: false,
+            url: `${this.baseUrl}/queue/item/${item.id}/`,
+            timestamp: item.inQueueSince ?? Date.now(),
+            duration: 0,
+            queued: true,
+            queueId: item.id,
+            queueWhy: item.why,
+            userName,
+          });
+        }
+      }
+    } catch {
+      // Queue API not available, skip
+    }
+
+    // 2. Get completed/in-progress builds
+    let builds: BuildSummary[] = [];
     try {
       const data = await this.getJson<any>(
         `/job/${encodeURIComponent(jobName)}/api/json?tree=builds[number,result,building,url,timestamp,duration,displayName,description,actions[causes[userId,userName]]]{0,${limit}}`
       );
-      if (!data?.builds) return [];
-      return data.builds.map((b: any) => {
-        // Extract trigger user from actions.causes
-        let userId: string | undefined;
-        let userName: string | undefined;
-        for (const action of b.actions || []) {
-          for (const cause of action.causes || []) {
-            if (cause.userId) {
-              userId = cause.userId;
-              userName = cause.userName;
-              break;
+      if (data?.builds) {
+        builds = data.builds.map((b: any) => {
+          // Extract trigger user from actions.causes
+          let userId: string | undefined;
+          let userName: string | undefined;
+          for (const action of b.actions || []) {
+            for (const cause of action.causes || []) {
+              if (cause.userId) {
+                userId = cause.userId;
+                userName = cause.userName;
+                break;
+              }
             }
+            if (userId) break;
           }
-          if (userId) break;
-        }
-        return {
-          number: b.number,
-          result: b.result,
-          building: b.building,
-          url: b.url,
-          timestamp: b.timestamp,
-          duration: b.duration,
-          displayName: b.displayName,
-          description: b.description,
-          userId,
-          userName,
-        };
-      });
+          return {
+            number: b.number,
+            result: b.result,
+            building: b.building,
+            url: b.url,
+            timestamp: b.timestamp,
+            duration: b.duration,
+            displayName: b.displayName,
+            description: b.description,
+            userId,
+            userName,
+          };
+        });
+      }
     } catch {
-      return [];
+      // Job API not available, return only queued items
     }
+
+    // 3. Merge: queued items first, then builds, truncate to limit
+    const merged = [...queuedItems, ...builds].slice(0, limit);
+    return merged;
   }
 
   // ── XML Parsing ─────────────────────────────────────────────────

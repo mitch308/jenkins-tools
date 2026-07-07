@@ -129,20 +129,31 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
       const duration = b.building ? '—' : `${Math.round(b.duration / 1000)}s`;
 
       let statusIcon: string;
-      if (b.building) {
+      let numberLabel: string;
+      if (b.queued) {
+        statusIcon = chalk.magenta('⏳ 排队中');
+        numberLabel = b.number ? chalk.bold(`#${b.number}`) : chalk.bold(`queue#${b.queueId}`);
+      } else if (b.building) {
         statusIcon = chalk.yellow('⏳ 构建中');
+        numberLabel = chalk.bold(`#${b.number}`);
       } else if (b.result === 'SUCCESS') {
         statusIcon = chalk.green('✔ 成功');
+        numberLabel = chalk.bold(`#${b.number}`);
       } else if (b.result === 'FAILURE') {
         statusIcon = chalk.red('✖ 失败');
+        numberLabel = chalk.bold(`#${b.number}`);
       } else if (b.result === 'ABORTED') {
         statusIcon = chalk.gray('⊘ 中止');
+        numberLabel = chalk.bold(`#${b.number}`);
       } else if (b.result === 'UNSTABLE') {
         statusIcon = chalk.yellow('⚠ 不稳定');
+        numberLabel = chalk.bold(`#${b.number}`);
       } else if (b.result === 'NOT_BUILT') {
         statusIcon = chalk.gray('○ 未构建');
+        numberLabel = chalk.bold(`#${b.number}`);
       } else {
         statusIcon = chalk.blue(`ℹ ${b.result || '未知'}`);
+        numberLabel = chalk.bold(`#${b.number}`);
       }
 
       // 构建描述行
@@ -153,9 +164,12 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
       if (b.description) {
         descParts.push(chalk.white(b.description));
       }
+      if (b.queued && b.queueWhy) {
+        descParts.push(chalk.gray(b.queueWhy));
+      }
       const descLine = descParts.length > 0 ? `  ${descParts.join(' ')}` : '';
 
-      console.log(`  ${chalk.bold(`#${b.number}`)}  ${statusIcon}  ${chalk.gray(time)}  ${chalk.gray(`耗时 ${duration}`)}${descLine}`);
+      console.log(`  ${numberLabel}  ${statusIcon}  ${chalk.gray(time)}  ${chalk.gray(`耗时 ${duration}`)}${descLine}`);
     }
     console.log();
     return;
