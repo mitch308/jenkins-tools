@@ -5,6 +5,20 @@ import { getBuildRecords } from '../config/store.js';
 import { printSuccess, printError, printInfo, printWarning, spinner } from '../utils/output.js';
 import chalk from 'chalk';
 
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${seconds}s`);
+
+  return parts.join('');
+}
+
 export function registerStatusCommand(program: Command): void {
   program
     .command('status [name]')
@@ -126,7 +140,7 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
 
     for (const b of builds) {
       const time = new Date(b.timestamp).toLocaleString('zh-CN');
-      const duration = b.building ? '—' : `${Math.round(b.duration / 1000)}s`;
+      const duration = b.building ? '—' : formatDuration(b.duration);
 
       let statusIcon: string;
       let numberLabel: string;
@@ -240,7 +254,7 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
 
     console.log(`\n构建 #${status.number}  ${statusIcon}`);
     console.log(`URL: ${status.url}`);
-    console.log(`耗时: ${Math.round(status.duration / 1000)}s`);
+    console.log(`耗时: ${formatDuration(status.duration)}`);
     console.log();
   } catch {
     // Build API 不可访问，可能还在排队中，查队列
