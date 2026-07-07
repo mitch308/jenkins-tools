@@ -64,6 +64,9 @@ export function registerStatusCommand(program: Command): void {
 
         console.log(`  ${chalk.bold(`#${i + 1}`)}  ${chalk.cyan(r.jobName)}  ${statusStr}`);
         console.log(`      ${chalk.gray(time)}${paramStr ? `  ${chalk.gray(paramStr)}` : ''}`);
+        if (r.queueUrl) {
+          console.log(`      ${chalk.blue(r.queueUrl)}`);
+        }
       }
       console.log();
     } catch (err: any) {

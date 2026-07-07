@@ -3,6 +3,21 @@ import { printSuccess, printError, printSummary, spinner } from '../utils/output
 import { confirm } from '../utils/prompt.js';
 import { addBuildRecord } from '../config/store.js';
 
+/**
+ * Strip embedded credentials from a URL.
+ * http://user:pass@host/path → http://host/path
+ */
+function stripAuthFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = '';
+    parsed.password = '';
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export async function runExecuteWizard(
   service: JenkinsService,
   jobName: string,
@@ -38,7 +53,18 @@ export async function runExecuteWizard(
   try {
     const result = await service.build(jobName, params);
     s.stop();
-    printSuccess(`构建已提交！队列地址: ${result.queueUrl || '(已触发)'}`);
+
+    // 输出构建结果
+    if (result.buildNumber) {
+      const buildUrl = stripAuthFromUrl(result.queueUrl).replace(/\/queue\/item\/\d+\/?/, `/job/${encodeURIComponent(jobName)}/${result.buildNumber}`);
+      printSuccess(`构建 #${result.buildNumber} 已提交！`);
+      console.log(`  URL: ${buildUrl}`);
+    } else {
+      printSuccess(`构建已提交！`);
+      if (result.queueUrl) {
+        console.log(`  队列: ${stripAuthFromUrl(result.queueUrl)}`);
+      }
+    }
 
     // 4. 记录构建历史
     if (cwd) {
@@ -48,6 +74,7 @@ export async function runExecuteWizard(
         params: Object.keys(params).length > 0 ? params : undefined,
         triggeredAt: new Date().toISOString(),
         server: serverProfile,
+        queueUrl: stripAuthFromUrl(result.queueUrl),
       });
     }
 

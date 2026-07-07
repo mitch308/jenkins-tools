@@ -5,6 +5,17 @@ import { addBuildRecord } from '../config/store.js';
 import { runParamsWizard } from '../wizard/params.js';
 import { printSuccess, printError, spinner } from '../utils/output.js';
 
+function stripAuthFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = '';
+    parsed.password = '';
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function registerBuildCommand(program: Command): void {
   program
     .command('build <job>')
@@ -61,7 +72,17 @@ export function registerBuildCommand(program: Command): void {
         const result = await service.build(jobName, Object.keys(params).length > 0 ? params : undefined);
         s.stop();
 
-        printSuccess(`构建已提交！队列地址: ${result.queueUrl || '(已触发)'}`);
+        // 输出构建结果
+        if (result.buildNumber) {
+          const buildUrl = stripAuthFromUrl(result.queueUrl).replace(/\/queue\/item\/\d+\/?/, `/job/${encodeURIComponent(jobName)}/${result.buildNumber}`);
+          printSuccess(`构建 #${result.buildNumber} 已提交！`);
+          console.log(`  URL: ${buildUrl}`);
+        } else {
+          printSuccess(`构建已提交！`);
+          if (result.queueUrl) {
+            console.log(`  队列: ${stripAuthFromUrl(result.queueUrl)}`);
+          }
+        }
 
         // 记录构建历史
         addBuildRecord(cwd, {
@@ -70,6 +91,7 @@ export function registerBuildCommand(program: Command): void {
           params: Object.keys(params).length > 0 ? params : undefined,
           triggeredAt: new Date().toISOString(),
           server: profileName,
+          queueUrl: stripAuthFromUrl(result.queueUrl),
         });
       } catch (err: any) {
         printError(err.message);

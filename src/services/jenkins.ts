@@ -164,7 +164,43 @@ export class JenkinsService {
         ? result.headers.location[0]
         : '';
 
-    return { queueUrl };
+    // Poll queue API to get build number (wait up to 10s)
+    let buildNumber: number | undefined;
+    if (queueUrl) {
+      buildNumber = await this.waitForBuildNumber(queueUrl, 10000);
+    }
+
+    return { queueUrl, buildNumber };
+  }
+
+  /**
+   * Wait for Jenkins queue to assign a build number.
+   * Polls the queue item API until executable.buildNumber appears.
+   */
+  private async waitForBuildNumber(queueUrl: string, timeoutMs: number): Promise<number | undefined> {
+    // Convert queue URL to API URL: http://host/queue/item/123/ → http://host/queue/item/123/api/json
+    const apiUrl = queueUrl.replace(/\/$/, '') + '/api/json';
+    const deadline = Date.now() + timeoutMs;
+    const interval = 1000;
+
+    while (Date.now() < deadline) {
+      try {
+        const data = await this.getJson<any>(apiUrl);
+        if (data?.executable?.number) {
+          return data.executable.number;
+        }
+        // Still queued, wait and retry
+        if (data?.why) {
+          await new Promise((r) => setTimeout(r, interval));
+          continue;
+        }
+      } catch {
+        // Queue item might not be ready yet
+      }
+      await new Promise((r) => setTimeout(r, interval));
+    }
+
+    return undefined;
   }
 
   async getBuildStatus(jobName: string, buildNumber: number): Promise<BuildStatus> {

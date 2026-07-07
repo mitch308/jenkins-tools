@@ -38,6 +38,7 @@ export interface BuildRecord {
   params?: Record<string, string>;
   triggeredAt: string;
   server?: string;
+  queueUrl?: string;
 }
 
 export interface JobParamDef {
