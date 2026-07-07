@@ -23,6 +23,28 @@ export interface BuildStatus {
   duration: number;
 }
 
+export interface BuildSummary {
+  number: number;
+  result: string | null;
+  building: boolean;
+  url: string;
+  timestamp: number;
+  duration: number;
+  displayName?: string;
+  description?: string;
+  userId?: string;
+  userName?: string;
+}
+
+export interface QueueItemInfo {
+  id: number;
+  buildNumber?: number;
+  jobName?: string;
+  why?: string;
+  stuck: boolean;
+  cancelled: boolean;
+}
+
 export class JenkinsService {
   private baseUrl: string;
   private authHeader: string;
@@ -203,6 +225,74 @@ export class JenkinsService {
     return undefined;
   }
 
+  /**
+   * Get queue item status from Jenkins queue API.
+   */
+  async getQueueItemStatus(queueUrl: string): Promise<QueueItemInfo> {
+    const apiUrl = queueUrl.replace(/\/$/, '') + '/api/json';
+    const data = await this.getJson<any>(apiUrl);
+    return {
+      id: data.id,
+      buildNumber: data.executable?.number,
+      jobName: data.task?.name,
+      why: data.why,
+      stuck: data.stuck ?? false,
+      cancelled: data.cancelled ?? false,
+    };
+  }
+
+  /**
+   * Cancel a queued build item.
+   * Accepts either a queue URL or a queue item ID.
+   */
+  async cancelQueueItem(queueUrlOrId: string | number): Promise<void> {
+    let itemId: string;
+    if (typeof queueUrlOrId === 'number') {
+      itemId = String(queueUrlOrId);
+    } else {
+      // Extract queue item ID from URL: http://host/queue/item/123/ → 123
+      const match = queueUrlOrId.match(/queue\/item\/(\d+)/);
+      if (!match) {
+        throw new Error(`Invalid queue URL: ${queueUrlOrId}`);
+      }
+      itemId = match[1];
+    }
+    const { statusCode } = await this.request(
+      `/queue/item/${itemId}/cancelQueue`,
+      { method: 'POST' },
+    );
+    // Jenkins returns 200 or 204 on success; some versions return 302 redirect
+    if (statusCode >= 400) {
+      throw new Error(`Failed to cancel queue item #${itemId}: HTTP ${statusCode}`);
+    }
+  }
+
+  /**
+   * Find a queued item by job name from the Jenkins queue.
+   * Returns the queue item info if found, null otherwise.
+   */
+  async findQueuedItem(jobName: string): Promise<QueueItemInfo | null> {
+    try {
+      const data = await this.getJson<any>('/queue/api/json');
+      const items = data.items || [];
+      for (const item of items) {
+        if (item.task?.name === jobName) {
+          return {
+            id: item.id,
+            buildNumber: item.executable?.number,
+            jobName: item.task.name,
+            why: item.why,
+            stuck: item.stuck ?? false,
+            cancelled: item.cancelled ?? false,
+          };
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   async getBuildStatus(jobName: string, buildNumber: number): Promise<BuildStatus> {
     const data = await this.getJson<any>(`/job/${encodeURIComponent(jobName)}/${buildNumber}/api/json`);
     return {
@@ -273,6 +363,48 @@ export class JenkinsService {
       };
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Get recent build list for a job.
+   * Returns build summaries in reverse chronological order (newest first).
+   */
+  async getRecentBuilds(jobName: string, limit: number = 10): Promise<BuildSummary[]> {
+    try {
+      const data = await this.getJson<any>(
+        `/job/${encodeURIComponent(jobName)}/api/json?tree=builds[number,result,building,url,timestamp,duration,displayName,description,actions[causes[userId,userName]]]{0,${limit}}`
+      );
+      if (!data?.builds) return [];
+      return data.builds.map((b: any) => {
+        // Extract trigger user from actions.causes
+        let userId: string | undefined;
+        let userName: string | undefined;
+        for (const action of b.actions || []) {
+          for (const cause of action.causes || []) {
+            if (cause.userId) {
+              userId = cause.userId;
+              userName = cause.userName;
+              break;
+            }
+          }
+          if (userId) break;
+        }
+        return {
+          number: b.number,
+          result: b.result,
+          building: b.building,
+          url: b.url,
+          timestamp: b.timestamp,
+          duration: b.duration,
+          displayName: b.displayName,
+          description: b.description,
+          userId,
+          userName,
+        };
+      });
+    } catch {
+      return [];
     }
   }
 

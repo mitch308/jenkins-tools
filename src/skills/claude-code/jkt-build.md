@@ -1,5 +1,4 @@
 ---
-name: jkt-build
 description: 触发 Jenkins 构建。当用户要求构建、部署、打包、触发 Jenkins 任务时使用。
 ---
 

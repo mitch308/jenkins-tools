@@ -26,16 +26,29 @@ const PLATFORMS: SkillPlatform[] = [
   {
     id: 'claude-code',
     name: 'Claude Code',
-    targetDir: '.claude/commands',
+    targetDir: '.claude',
     files: [
+      // Slash commands
       { src: 'claude-code/jkt-build.md', dest: '.claude/commands/jkt-build.md' },
       { src: 'claude-code/jkt-status.md', dest: '.claude/commands/jkt-status.md' },
       { src: 'claude-code/jkt-abort.md', dest: '.claude/commands/jkt-abort.md' },
       { src: 'claude-code/jkt-config.md', dest: '.claude/commands/jkt-config.md' },
+      // Skills
+      { src: 'claude-code/skills/jkt/SKILL.md', dest: '.claude/skills/jkt/SKILL.md' },
+      // Agents
+      { src: 'claude-code/agents/jkt.md', dest: '.claude/agents/jkt.md' },
     ],
     install(targetRoot, filesDir) {
-      const destDir = path.join(targetRoot, '.claude', 'commands');
-      fs.mkdirSync(destDir, { recursive: true });
+      // Install commands
+      const commandsDir = path.join(targetRoot, '.claude', 'commands');
+      fs.mkdirSync(commandsDir, { recursive: true });
+      // Install skills
+      const skillsDir = path.join(targetRoot, '.claude', 'skills', 'jkt');
+      fs.mkdirSync(skillsDir, { recursive: true });
+      // Install agents
+      const agentsDir = path.join(targetRoot, '.claude', 'agents');
+      fs.mkdirSync(agentsDir, { recursive: true });
+
       for (const f of this.files) {
         const src = path.join(filesDir, f.src);
         const dest = path.join(targetRoot, f.dest);
@@ -53,13 +66,26 @@ const PLATFORMS: SkillPlatform[] = [
   {
     id: 'cursor',
     name: 'Cursor',
-    targetDir: '.cursor/rules',
+    targetDir: '.cursor',
     files: [
+      // Rules
       { src: 'cursor/jkt.mdc', dest: '.cursor/rules/jkt.mdc' },
+      // Skills
+      { src: 'cursor/skills/jkt/SKILL.md', dest: '.cursor/skills/jkt/SKILL.md' },
+      // Agents
+      { src: 'cursor/agents/jkt.md', dest: '.cursor/agents/jkt.md' },
     ],
     install(targetRoot, filesDir) {
-      const destDir = path.join(targetRoot, '.cursor', 'rules');
-      fs.mkdirSync(destDir, { recursive: true });
+      // Install rules
+      const rulesDir = path.join(targetRoot, '.cursor', 'rules');
+      fs.mkdirSync(rulesDir, { recursive: true });
+      // Install skills
+      const skillsDir = path.join(targetRoot, '.cursor', 'skills', 'jkt');
+      fs.mkdirSync(skillsDir, { recursive: true });
+      // Install agents
+      const agentsDir = path.join(targetRoot, '.cursor', 'agents');
+      fs.mkdirSync(agentsDir, { recursive: true });
+
       for (const f of this.files) {
         const src = path.join(filesDir, f.src);
         const dest = path.join(targetRoot, f.dest);
@@ -114,32 +140,50 @@ const PLATFORMS: SkillPlatform[] = [
   {
     id: 'opencode',
     name: 'OpenCode',
-    targetDir: '.',
+    targetDir: '.opencode',
     files: [
-      { src: 'opencode/opencode-commands.json', dest: '' },
+      { src: 'opencode/agents/jkt.md', dest: '.opencode/agents/jkt.md' },
     ],
     install(targetRoot, filesDir) {
-      const commandsSrc = path.join(filesDir, 'opencode', 'opencode-commands.json');
-      const newCommands = JSON.parse(fs.readFileSync(commandsSrc, 'utf-8')).commands;
-      const configFile = path.join(targetRoot, 'opencode.json');
+      // Install .opencode/agents/
+      const agentsDir = path.join(targetRoot, '.opencode', 'agents');
+      fs.mkdirSync(agentsDir, { recursive: true });
+      const agentSrc = path.join(filesDir, 'opencode', 'agents', 'jkt.md');
+      if (fs.existsSync(agentSrc)) {
+        fs.copyFileSync(agentSrc, path.join(agentsDir, 'jkt.md'));
+      }
 
-      if (fs.existsSync(configFile)) {
-        const existing = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
-        const existingCommands = existing.commands || [];
-        // Remove old jkt commands (by name prefix)
-        const filtered = existingCommands.filter((c: any) => !c.name?.startsWith('jkt-'));
-        existing.commands = [...filtered, ...newCommands];
+      // Merge agent definitions into opencode.json
+      const configSrc = path.join(filesDir, 'opencode', 'opencode-config.json');
+      if (fs.existsSync(configSrc)) {
+        const newAgents = JSON.parse(fs.readFileSync(configSrc, 'utf-8')).agent || {};
+        const configFile = path.join(targetRoot, 'opencode.json');
+
+        let existing: any = {};
+        if (fs.existsSync(configFile)) {
+          try {
+            existing = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+          } catch { /* ignore */ }
+        }
+
+        // Remove old jkt agents (by key prefix)
+        if (existing.agent) {
+          for (const key of Object.keys(existing.agent)) {
+            if (key.startsWith('jkt-')) {
+              delete existing.agent[key];
+            }
+          }
+        } else {
+          existing.agent = {};
+        }
+
+        // Merge new agents
+        Object.assign(existing.agent, newAgents);
         fs.writeFileSync(configFile, JSON.stringify(existing, null, 2), 'utf-8');
-      } else {
-        const config = { commands: newCommands };
-        fs.writeFileSync(configFile, JSON.stringify(config, null, 2), 'utf-8');
       }
     },
     isInstalled(targetRoot) {
-      const configFile = path.join(targetRoot, 'opencode.json');
-      if (!fs.existsSync(configFile)) return false;
-      const content = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
-      return (content.commands || []).some((c: any) => c.name?.startsWith('jkt-'));
+      return fs.existsSync(path.join(targetRoot, '.opencode', 'agents', 'jkt.md'));
     },
   },
 ];

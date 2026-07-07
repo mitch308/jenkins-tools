@@ -19,7 +19,7 @@ Interactive Jenkins CLI tool (`jkt`) built with TypeScript ESM (Node16 module re
 
 **Wizard flow** (the core UX): `auth → job-select → params → execute`. Each step lives in `src/wizard/`. The default `jkt` command and `jkt run` both run the full wizard. `jkt build <job>` triggers directly but enters the params wizard if no `-p` flags are given.
 
-**JenkinsService** (`src/services/jenkins.ts`): Direct REST API calls via Node `http`/`https` — no third-party Jenkins library. Parameters are parsed from `/job/<name>/config.xml` (not the JSON API) because the uno-choice plugin's `ChoiceParameter` only exposes choices in the XML Groovy script element. XML entity decoding (`&apos;` → `'`) is required before parsing the script.
+**JenkinsService** (`src/services/jenkins.ts`): Direct REST API calls via Node `http`/`https` — no third-party Jenkins library. Parameters are parsed from `/job/<name>/config.xml` (not the JSON API) because the uno-choice plugin's `ChoiceParameter` only exposes choices in the XML Groovy script element. XML entity decoding (`&apos;` → `'`) is required before parsing the script. Queue operations (`getQueueItemStatus`, `cancelQueueItem`, `findQueuedItem`) handle builds that haven't started executing yet — they exist in `/queue/item/<id>/` not `/job/<name>/<buildNumber>/`.
 
 **Config layers** (`src/config/`):
 - `.jenkinsrc.yml` — server profiles and job presets (loaded by `loader.ts`)
@@ -36,5 +36,9 @@ Interactive Jenkins CLI tool (`jkt`) built with TypeScript ESM (Node16 module re
 - **Jenkins URLs**: Never expose URLs with embedded credentials (`user:pass@host`) in user-facing output. Use `stripAuthFromUrl()` to clean them.
 - **XML parameter parsing** (`parseParamsFromXml`): Parses parameters in XML document order (not by type) to preserve the order shown in Jenkins. The regex matches all parameter tag types in a single pass.
 - **Build record tracking**: Every build triggered via `jkt` or `jkt build` is recorded in `buildRecords[]` in the history file. This feeds the `jkt status` and `jkt abort` commands.
-- **Skill installer** (`src/setup-skills.ts`): Triggered by npm `postinstall`. Installs agent/IDE skill files (Claude Code, Cursor, Codex, OpenCode) to the user's project. Skills are in `src/skills/` and copied to `dist/skills/` during build. Idempotent via `<!-- jkt-skills -->` markers.
+- **Skill installer** (`src/setup-skills.ts`): Triggered by npm `postinstall`. Installs agent/IDE skill files to the user's project. Skills are in `src/skills/` and copied to `dist/skills/` during build. Each platform installs different file types:
+  - **Claude Code**: `.claude/commands/` (slash commands), `.claude/skills/jkt/SKILL.md` (skill), `.claude/agents/jkt.md` (subagent)
+  - **Cursor**: `.cursor/rules/jkt.mdc` (rule), `.cursor/skills/jkt/SKILL.md` (skill), `.cursor/agents/jkt.md` (subagent)
+  - **Codex**: `AGENTS.md` section appended with `<!-- jkt-skills -->` markers (idempotent replacement)
+  - **OpenCode**: `.opencode/agents/jkt.md` (agent definition), `opencode.json` `agent` field merged (idempotent by `jkt-` key prefix)
 - **Build script**: `npm run build` compiles TypeScript then copies `src/skills/` to `dist/skills/` (non-TS assets).

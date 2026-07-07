@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { loadConfig } from '../config/loader.js';
 import { JenkinsService } from '../services/jenkins.js';
 import { getBuildRecords } from '../config/store.js';
-import { printSuccess, printError, printInfo, spinner } from '../utils/output.js';
+import { printSuccess, printError, printInfo, printWarning, spinner } from '../utils/output.js';
 import chalk from 'chalk';
 
 export function registerStatusCommand(program: Command): void {
@@ -10,9 +10,10 @@ export function registerStatusCommand(program: Command): void {
     .command('status [name]')
     .description('查询构建状态（无参数显示最近记录，指定 Job 名查询详情）')
     .option('-n, --number <buildNumber>', '构建号', parseInt)
+    .option('-r, --recent <count>', '查看最近 N 次构建记录', parseInt)
     .option('-l, --log', '查看构建日志')
     .option('-s, --server <profile>', '服务器 Profile 名称')
-    .action(async (name: string | undefined, options: { number?: number; log?: boolean; server?: string }) => {
+    .action(async (name: string | undefined, options: { number?: number; recent?: number; log?: boolean; server?: string }) => {
       try {
         if (name) {
           // 查询指定 Job 的构建状态
@@ -87,7 +88,7 @@ async function showRecentBuilds(): Promise<void> {
   console.log();
 }
 
-async function showJobStatus(job: string, options: { number?: number; log?: boolean; server?: string }): Promise<void> {
+async function showJobStatus(job: string, options: { number?: number; recent?: number; log?: boolean; server?: string }): Promise<void> {
   const cwd = process.cwd();
   const config = loadConfig(cwd);
   if (!config) {
@@ -109,6 +110,58 @@ async function showJobStatus(job: string, options: { number?: number; log?: bool
   }
 
   const service = new JenkinsService(profile);
+
+  // 查看最近 N 次构建记录
+  if (options.recent) {
+    const count = options.recent || 10;
+    const s = spinner(`查询 ${jobName} 最近 ${count} 次构建...`);
+    s.start();
+    const builds = await service.getRecentBuilds(jobName, count);
+    s.stop();
+
+    if (builds.length === 0) {
+      printInfo(`${jobName} 没有构建记录`);
+      return;
+    }
+
+    console.log(chalk.bold(`\n${jobName} 最近 ${builds.length} 次构建：\n`));
+
+    for (const b of builds) {
+      const time = new Date(b.timestamp).toLocaleString('zh-CN');
+      const duration = b.building ? '—' : `${Math.round(b.duration / 1000)}s`;
+
+      let statusIcon: string;
+      if (b.building) {
+        statusIcon = chalk.yellow('⏳ 构建中');
+      } else if (b.result === 'SUCCESS') {
+        statusIcon = chalk.green('✔ 成功');
+      } else if (b.result === 'FAILURE') {
+        statusIcon = chalk.red('✖ 失败');
+      } else if (b.result === 'ABORTED') {
+        statusIcon = chalk.gray('⊘ 中止');
+      } else if (b.result === 'UNSTABLE') {
+        statusIcon = chalk.yellow('⚠ 不稳定');
+      } else if (b.result === 'NOT_BUILT') {
+        statusIcon = chalk.gray('○ 未构建');
+      } else {
+        statusIcon = chalk.blue(`ℹ ${b.result || '未知'}`);
+      }
+
+      // 构建描述行
+      const descParts: string[] = [];
+      if (b.userName) {
+        descParts.push(chalk.cyan(`@${b.userName}`));
+      }
+      if (b.description) {
+        descParts.push(chalk.white(b.description));
+      }
+      const descLine = descParts.length > 0 ? `  ${descParts.join(' ')}` : '';
+
+      console.log(`  ${chalk.bold(`#${b.number}`)}  ${statusIcon}  ${chalk.gray(time)}  ${chalk.gray(`耗时 ${duration}`)}${descLine}`);
+    }
+    console.log();
+    return;
+  }
 
   // 获取构建号
   let buildNumber = options.number;

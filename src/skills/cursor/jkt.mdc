@@ -18,10 +18,11 @@ alwaysApply: false
 
 ## 查询状态
 
-当用户要求查看构建状态、结果、日志时：
+当用户要求查看构建状态、结果、日志、历史时：
 
 - 最近构建记录：`jkt status`
 - 指定任务：`jkt status <job-name>`
+- 最近 N 次构建：`jkt status <job-name> -r <count>`
 - 指定构建号：`jkt status <job-name> -n <build-number>`
 - 查看日志：`jkt status <job-name> --log`
 
@@ -30,7 +31,8 @@ alwaysApply: false
 当用户要求停止、取消、删除构建时：
 
 - 交互式选择：`jkt abort`
-- 指定构建号：`jkt abort -n <build-number>`
+- 指定构建：`jkt abort <job-name> -n <build-number>`
+- 支持取消排队中的构建（自动从 Jenkins 队列查找）
 
 ## 配置管理
 
@@ -39,6 +41,17 @@ alwaysApply: false
 - 初始化：`jkt config init`
 - 测试连接：`jkt config test`
 - 查看配置：`jkt config list`
+
+## 状态图标
+
+| 图标 | 含义 |
+|------|------|
+| ✔ | 成功 |
+| ✖ | 失败 |
+| ⏳ | 构建中/排队中 |
+| ⊘ | 中止 |
+| ⚠ | 不稳定 |
+| ○ | 未构建 |
 
 ## 注意事项
 

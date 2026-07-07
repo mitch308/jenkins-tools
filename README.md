@@ -8,8 +8,8 @@
 - 🔍 **任务搜索** — 从 Jenkins 搜索并选择任务，自动显示最近构建状态
 - 📋 **参数记忆** — 自动合并 Jenkins 默认值、配置文件预设和上次使用的参数
 - ✅ **选择类型参数** — 自动识别 Choice/Radio 类型参数，提供选项列表
-- 📊 **构建状态** — 查看最近构建记录及实时状态
-- 🛑 **中止/删除** — 中止正在运行的任务或删除已完成任务
+- 📊 **构建状态** — 查看最近构建记录及实时状态，支持查看指定 Job 的最近 N 次构建历史
+- 🛑 **中止/删除** — 中止正在运行的任务、取消排队中的构建或删除已完成任务
 
 ## 安装
 
@@ -58,6 +58,7 @@ jkt build pc-dev -p branch=main -p ENV=prod  # 直接传参构建
 jkt status               # 显示最近由本工具触发的构建记录
 jkt status pc-dev        # 查询指定 Job 的最近构建状态
 jkt status pc-dev -n 42  # 查询指定构建号
+jkt status pc-dev -r 10  # 查看最近 10 次构建记录
 jkt status pc-dev --log  # 查看构建日志
 ```
 
@@ -69,6 +70,7 @@ jkt abort pc-dev       # 中止/删除指定 Job 的最近构建
 jkt abort pc-dev -n 42 # 中止/删除指定构建号
 ```
 
+- 排队中的任务 → 取消排队
 - 正在构建的任务 → 中止
 - 已完成的任务 → 删除记录
 
@@ -130,10 +132,10 @@ npm link          # 全局安装（开发用）
 
 安装时自动提示安装 Agent/IDE Skills，支持：
 
-- **Claude Code** → `.claude/commands/jkt-*.md`
-- **Cursor** → `.cursor/rules/jkt.mdc`
-- **Codex** → `AGENTS.md` 追加章节
-- **OpenCode** → `opencode.json` 追加命令
+- **Claude Code** → `.claude/commands/jkt-*.md`（slash 命令）、`.claude/skills/jkt/`（技能）、`.claude/agents/jkt.md`（子代理）
+- **Cursor** → `.cursor/rules/jkt.mdc`（规则）、`.cursor/skills/jkt/`（技能）、`.cursor/agents/jkt.md`（子代理）
+- **Codex** → `AGENTS.md` 追加章节（幂等替换）
+- **OpenCode** → `.opencode/agents/jkt.md`（代理定义）、`opencode.json` agent 字段合并（幂等）
 
 也可手动运行：
 

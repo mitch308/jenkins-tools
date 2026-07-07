@@ -97,11 +97,25 @@ export function registerAbortCommand(program: Command): void {
                 queueUrl: r.queueUrl,
               });
             } catch {
+              // 构建可能还在排队中，检查队列
+              let isQueued = false;
+              if (r.queueUrl) {
+                try {
+                  const queueInfo = await service.getQueueItemStatus(r.queueUrl);
+                  if (!queueInfo.cancelled) isQueued = true;
+                } catch { /* ignore */ }
+              }
+              if (!isQueued) {
+                try {
+                  const queued = await service.findQueuedItem(r.jobName);
+                  if (queued) isQueued = true;
+                } catch { /* ignore */ }
+              }
               statuses.push({
                 jobName: r.jobName,
                 buildNumber: r.buildNumber,
-                building: false,
-                result: null,
+                building: isQueued,
+                result: isQueued ? 'QUEUED' : null,
                 queueUrl: r.queueUrl,
               });
             }
@@ -112,7 +126,9 @@ export function registerAbortCommand(program: Command): void {
         // 筛选出可以进行操作的构建（构建中的可中止，已完成的可删除）
         const choices = statuses.map((st, i) => {
           let label = '';
-          if (st.building) {
+          if (st.result === 'QUEUED') {
+            label = chalk.magenta(`⏳ #${st.buildNumber} 排队中`) + ` — ${chalk.cyan(st.jobName)}  [取消]`;
+          } else if (st.building) {
             label = chalk.yellow(`⏳ #${st.buildNumber} 构建中`) + ` — ${chalk.cyan(st.jobName)}  [中止]`;
           } else if (st.result === 'SUCCESS') {
             label = chalk.green(`✔ #${st.buildNumber} 成功`) + ` — ${chalk.cyan(st.jobName)}  [删除]`;
@@ -144,7 +160,7 @@ export function registerAbortCommand(program: Command): void {
 
         const target = statuses[selected];
         if (target.buildNumber) {
-          await abortOrDelete(service, target.jobName, target.buildNumber);
+          await abortOrDelete(service, target.jobName, target.buildNumber, target.queueUrl);
         }
       } catch (err: any) {
         printError(err.message);
@@ -153,21 +169,74 @@ export function registerAbortCommand(program: Command): void {
     });
 }
 
-async function abortOrDelete(service: JenkinsService, jobName: string, buildNumber: number): Promise<void> {
-  // 先查询状态
+async function abortOrDelete(service: JenkinsService, jobName: string, buildNumber: number, queueUrl?: string): Promise<void> {
+  // 先查询构建状态
   const s = spinner(`查询构建 #${buildNumber} 状态...`);
   s.start();
   let status;
+  let isQueued = false;
+  let queuedItemId: number | undefined;
   try {
     status = await service.getBuildStatus(jobName, buildNumber);
   } catch {
+    // 构建可能还在排队中，尝试通过队列 API 查找
     s.stop();
-    printError(`构建 #${buildNumber} 不存在或无法访问`);
-    return;
+
+    // 1. 如果有 queueUrl，直接查队列状态
+    if (queueUrl) {
+      try {
+        const queueInfo = await service.getQueueItemStatus(queueUrl);
+        if (!queueInfo.cancelled) {
+          isQueued = true;
+          queuedItemId = queueInfo.id;
+        }
+      } catch {
+        // queueUrl 也访问不了
+      }
+    }
+
+    // 2. 如果没有 queueUrl 或队列也没找到，尝试在 Jenkins 队列中搜索
+    if (!isQueued) {
+      try {
+        const queued = await service.findQueuedItem(jobName);
+        if (queued) {
+          isQueued = true;
+          queuedItemId = queued.id;
+        }
+      } catch {
+        // 队列 API 也失败
+      }
+    }
+
+    if (!isQueued) {
+      printError(`构建 #${buildNumber} 不存在或无法访问（可能未分配到执行器，且不在队列中）`);
+      return;
+    }
   }
   s.stop();
 
-  if (status.building) {
+  // 处理排队中的构建
+  if (isQueued) {
+    printWarning(`构建 #${buildNumber} 正在排队中，尚未开始执行`);
+    const confirmed = await confirm(`确认取消 ${chalk.cyan(jobName)} 排队中的构建？`, true);
+    if (!confirmed) return;
+
+    const s2 = spinner(`正在取消排队...`);
+    s2.start();
+    try {
+      // cancelQueueItem 支持 queueUrl 或 queueItemId
+      await service.cancelQueueItem(queuedItemId ?? queueUrl!);
+      s2.stop();
+      printSuccess(`排队中的构建已取消`);
+    } catch (err: any) {
+      s2.stop();
+      printError(`取消排队失败: ${err.message}`);
+    }
+    return;
+  }
+
+  // At this point status is guaranteed to be set (isQueued path returns early)
+  if (status!.building) {
     // 构建中 → 中止
     const confirmed = await confirm(`确认中止 ${chalk.cyan(jobName)} #${buildNumber}？`, true);
     if (!confirmed) return;
@@ -184,7 +253,7 @@ async function abortOrDelete(service: JenkinsService, jobName: string, buildNumb
     }
   } else {
     // 已完成 → 删除
-    printWarning(`构建 #${buildNumber} 已完成 (${status.result || '未知'})`);
+    printWarning(`构建 #${buildNumber} 已完成 (${status!.result || '未知'})`);
     const action = await select('请选择操作:', [
       { name: '删除构建记录', value: 'delete' },
       { name: '取消', value: 'cancel' },

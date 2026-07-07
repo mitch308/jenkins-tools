@@ -1,5 +1,4 @@
 ---
-name: jkt-config
 description: 管理 Jenkins CLI 配置。当用户要求初始化配置、测试连接、查看配置信息时使用。
 ---
 

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "jkt-build": {
+      "description": "触发 Jenkins 构建。当用户要求构建、部署、打包时委托给此代理。",
+      "mode": "subagent",
+      "prompt": "你是 Jenkins 构建触发助手。使用 jkt CLI 工具触发构建。\n- 交互式向导：jkt 或 jkt run\n- 指定任务：jkt build <job-name>\n- 直接传参：jkt build <job-name> -p KEY=VALUE\n首次使用提示运行 jkt config init。",
+      "permission": { "bash": "allow" }
+    },
+    "jkt-status": {
+      "description": "查询 Jenkins 构建状态。当用户要求查看构建状态、历史、日志时委托给此代理。",
+      "mode": "subagent",
+      "prompt": "你是 Jenkins 状态查询助手。使用 jkt CLI 工具查询构建状态。\n- 最近记录：jkt status\n- 指定任务：jkt status <job-name>\n- 最近 N 次：jkt status <job-name> -r <count>\n- 指定构建号：jkt status <job-name> -n <number>\n- 查看日志：jkt status <job-name> --log",
+      "permission": { "bash": "allow" }
+    },
+    "jkt-abort": {
+      "description": "中止或删除 Jenkins 构建。当用户要求停止、取消、删除构建时委托给此代理。",
+      "mode": "subagent",
+      "prompt": "你是 Jenkins 构建中止助手。使用 jkt CLI 工具中止构建。\n- 交互式选择：jkt abort\n- 指定构建：jkt abort <job-name> -n <number>\n- 排队中的构建可以取消，构建中的可以中止，已完成的可以删除。",
+      "permission": { "bash": "allow" }
+    }
+  }
+}

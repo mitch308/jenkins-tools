@@ -1,6 +1,5 @@
 ---
-name: jkt-status
-description: 查询 Jenkins 构建状态。当用户要求查看构建状态、构建结果、构建日志时使用。
+description: 查询 Jenkins 构建状态。当用户要求查看构建状态、构建结果、构建日志、构建历史时使用。
 ---
 
 # 查询 Jenkins 构建状态
@@ -21,10 +20,24 @@ jkt status
 jkt status <job-name>
 ```
 
+显示该任务最近一次构建的状态、URL 和耗时。
+
 ## 查询指定构建号
 
 ```bash
 jkt status <job-name> -n <build-number>
+```
+
+## 查看最近 N 次构建记录
+
+```bash
+jkt status <job-name> -r <count>
+```
+
+查询某任务在 Jenkins 上的最近 N 次构建记录列表，包含构建号、状态、时间和耗时。例如：
+
+```bash
+jkt status pc-dev -r 10
 ```
 
 ## 查看构建日志
@@ -33,13 +46,25 @@ jkt status <job-name> -n <build-number>
 jkt status <job-name> --log
 ```
 
+或指定构建号查看日志：
+
+```bash
+jkt status <job-name> -n <build-number> --log
+```
+
 ## 使用预设别名
 
 ```bash
 jkt status frontend-deploy
 ```
 
-## 注意事项
+## 状态图标
 
-- `jkt status` 无参数显示本工具触发的最近构建记录
-- 构建状态图标：✔ 成功、✖ 失败、⏳ 构建中、⊘ 中止
+| 图标 | 含义 |
+|------|------|
+| ✔ | 成功 |
+| ✖ | 失败 |
+| ⏳ | 构建中 |
+| ⊘ | 中止 |
+| ⚠ | 不稳定 |
+| ○ | 未构建 |
