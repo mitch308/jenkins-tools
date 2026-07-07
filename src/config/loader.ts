@@ -1,16 +1,14 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import * as yaml from 'js-yaml';
 import type { AppConfig } from './schema.js';
+import { getConfigPath as getGlobalConfigPath, getConfigDir as getGlobalConfigDir } from './paths.js';
 
-const CONFIG_FILE = '.jenkinsrc.yml';
-
-export function findConfigPath(cwd: string): string {
-  return path.resolve(cwd, CONFIG_FILE);
+export function findConfigPath(): string {
+  return getGlobalConfigPath();
 }
 
-export function loadConfig(cwd: string): AppConfig | null {
-  const configPath = findConfigPath(cwd);
+export function loadConfig(): AppConfig | null {
+  const configPath = findConfigPath();
   if (!fs.existsSync(configPath)) {
     return null;
   }
@@ -22,8 +20,15 @@ export function loadConfig(cwd: string): AppConfig | null {
   return parsed;
 }
 
-export function saveConfig(cwd: string, config: AppConfig): void {
-  const configPath = findConfigPath(cwd);
+export function saveConfig(config: AppConfig): void {
+  const configPath = findConfigPath();
   const content = yaml.dump(config, { lineWidth: 120, noRefs: true });
   fs.writeFileSync(configPath, content, 'utf-8');
+}
+
+/**
+ * Get the config directory path (~/.jkt/).
+ */
+export function getConfigDir(): string {
+  return getGlobalConfigDir();
 }

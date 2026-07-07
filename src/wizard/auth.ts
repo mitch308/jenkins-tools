@@ -10,8 +10,8 @@ export interface AuthResult {
   profileName: string;
 }
 
-export async function runAuthWizard(cwd: string): Promise<AuthResult> {
-  const config = loadConfig(cwd);
+export async function runAuthWizard(): Promise<AuthResult> {
+  const config = loadConfig();
 
   // 已有配置，尝试验证
   if (config?.servers?.profiles && config.servers.default) {
@@ -42,19 +42,19 @@ export async function runAuthWizard(cwd: string): Promise<AuthResult> {
       }
 
       if (action === 'switch') {
-        return switchProfile(cwd, config);
+        return switchProfile(config);
       }
 
       // reconfigure
-      return reconfigureProfile(cwd, config, profileName);
+      return reconfigureProfile(config, profileName);
     }
   }
 
   // 全新配置
-  return newProfile(cwd);
+  return newProfile();
 }
 
-async function switchProfile(cwd: string, config: AppConfig): Promise<AuthResult> {
+async function switchProfile(config: AppConfig): Promise<AuthResult> {
   const profileNames = Object.keys(config.servers.profiles);
   const choices = profileNames.map((name) => ({
     name: `${name} (${config.servers.profiles[name].url})`,
@@ -63,7 +63,7 @@ async function switchProfile(cwd: string, config: AppConfig): Promise<AuthResult
 
   const selected = await select('选择服务器 Profile:', choices);
   config.servers.default = selected;
-  saveConfig(cwd, config);
+  saveConfig(config);
 
   const profile = config.servers.profiles[selected];
   const s = spinner('验证 Jenkins 连接...');
@@ -78,14 +78,14 @@ async function switchProfile(cwd: string, config: AppConfig): Promise<AuthResult
   }
 
   printError(`连接 ${selected} 失败`);
-  return reconfigureProfile(cwd, config, selected);
+  return reconfigureProfile(config, selected);
 }
 
-async function reconfigureProfile(cwd: string, config: AppConfig, profileName: string): Promise<AuthResult> {
+async function reconfigureProfile(config: AppConfig, profileName: string): Promise<AuthResult> {
   printWarning(`重新配置 "${profileName}"`);
   const profile = await promptProfileDetails(config.servers.profiles[profileName]?.url);
   config.servers.profiles[profileName] = profile;
-  saveConfig(cwd, config);
+  saveConfig(config);
 
   const service = new JenkinsService(profile);
   const s = spinner('验证 Jenkins 连接...');
@@ -102,7 +102,7 @@ async function reconfigureProfile(cwd: string, config: AppConfig, profileName: s
   process.exit(1);
 }
 
-async function newProfile(cwd: string): Promise<AuthResult> {
+async function newProfile(): Promise<AuthResult> {
   console.log('未找到 Jenkins 配置，请进行初始配置：\n');
 
   const profile = await promptProfileDetails();
@@ -114,7 +114,7 @@ async function newProfile(cwd: string): Promise<AuthResult> {
       profiles: { [profileName]: profile },
     },
   };
-  saveConfig(cwd, config);
+  saveConfig(config);
 
   const service = new JenkinsService(profile);
   const s = spinner('验证 Jenkins 连接...');
@@ -130,7 +130,7 @@ async function newProfile(cwd: string): Promise<AuthResult> {
   printError('连接失败，请检查配置');
   const retry = await confirm('是否重新配置？');
   if (retry) {
-    return newProfile(cwd);
+    return newProfile();
   }
   process.exit(1);
 }

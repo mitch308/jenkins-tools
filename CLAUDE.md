@@ -22,10 +22,11 @@ Interactive Jenkins CLI tool (`jkt`) built with TypeScript ESM (Node16 module re
 **JenkinsService** (`src/services/jenkins.ts`): Direct REST API calls via Node `http`/`https` — no third-party Jenkins library. Parameters are parsed from `/job/<name>/config.xml` (not the JSON API) because the uno-choice plugin's `ChoiceParameter` only exposes choices in the XML Groovy script element. XML entity decoding (`&apos;` → `'`) is required before parsing the script. Queue operations (`getQueueItemStatus`, `cancelQueueItem`, `findQueuedItem`) handle builds that haven't started executing yet — they exist in `/queue/item/<id>/` not `/job/<name>/<buildNumber>/`.
 
 **Config layers** (`src/config/`):
-- `.jenkinsrc.yml` — server profiles and job presets (loaded by `loader.ts`)
-- `.jenkins-history.json` — parameter history, last job, and build records (managed by `store.ts`). File format has `meta`, `jobs`, and `buildRecords` keys.
+- `~/.jkt/.jenkinsrc.yml` — server profiles and job presets (loaded by `loader.ts`). All config stored in global `~/.jkt/` directory, not project-local.
+- `~/.jkt/.jenkins-history.json` — parameter history, last job, and build records (managed by `store.ts`). File format has `meta`, `jobs`, and `buildRecords` keys.
+- `paths.ts` — centralizes all config file path resolution (`getConfigDir()`, `getConfigPath()`, `getHistoryPath()`).
 
-**Parameter merge priority** (low → high): Jenkins default → `.jenkinsrc.yml` job preset → `.jenkins-history.json` last params
+**Parameter merge priority** (low → high): Jenkins default → `~/.jkt/.jenkinsrc.yml` job preset → `~/.jkt/.jenkins-history.json` last params
 
 **Prompt wrapper** (`src/utils/prompt.ts`): All inquirer interactions go through this module. Inquirer v14 uses `type: 'select'` (not `'list'`). The `select()` function accepts an optional `defaultValue` parameter.
 

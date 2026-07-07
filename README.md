@@ -84,7 +84,15 @@ jkt config list    # 列出服务器和任务配置
 
 ## 配置
 
-在项目目录下创建 `.jenkinsrc.yml`（可参考 `.jenkinsrc.example.yml`）：
+配置文件统一存放在 `~/.jkt/` 目录下，全局安装后在任意目录运行 `jkt` 均可访问：
+
+```
+~/.jkt/
+  .jenkinsrc.yml          # 服务器配置和任务预设
+  .jenkins-history.json   # 参数历史和构建记录
+```
+
+首次运行 `jkt` 或 `jkt config init` 会自动创建配置目录和文件。
 
 ```yaml
 servers:
@@ -115,8 +123,8 @@ jobs:
 构建参数按以下优先级合并（后者覆盖前者）：
 
 1. Jenkins 参数定义的默认值
-2. `.jenkinsrc.yml` 中预设的参数值
-3. `.jenkins-history.json` 中最近一次使用的参数值
+2. `~/.jkt/.jenkinsrc.yml` 中预设的参数值
+3. `~/.jkt/.jenkins-history.json` 中最近一次使用的参数值
 
 ## 开发
 

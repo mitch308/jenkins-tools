@@ -30,15 +30,14 @@ export function registerStatusCommand(program: Command): void {
 }
 
 async function showRecentBuilds(): Promise<void> {
-  const cwd = process.cwd();
-  const records = getBuildRecords(cwd, 20);
+  const records = getBuildRecords(20);
 
   if (records.length === 0) {
     printInfo('没有本工具触发的构建记录，请先运行 jkt 或 jkt build 触发构建');
     return;
   }
 
-  const config = loadConfig(cwd);
+  const config = loadConfig();
 
   console.log(chalk.bold('\n最近构建记录：\n'));
 
@@ -89,8 +88,7 @@ async function showRecentBuilds(): Promise<void> {
 }
 
 async function showJobStatus(job: string, options: { number?: number; recent?: number; log?: boolean; server?: string }): Promise<void> {
-  const cwd = process.cwd();
-  const config = loadConfig(cwd);
+  const config = loadConfig();
   if (!config) {
     printError('未找到配置文件，请先运行 jkt config init');
     process.exit(1);

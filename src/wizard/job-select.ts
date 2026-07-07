@@ -29,7 +29,6 @@ export async function runJobSelectWizard(
   config: AppConfig,
   service: JenkinsService,
   preselectedJob?: string,
-  cwd?: string,
 ): Promise<JobSelection> {
   // 如果通过 --job 参数预选了任务
   if (preselectedJob) {
@@ -49,7 +48,7 @@ export async function runJobSelectWizard(
 
   const jobs = config.jobs || {};
   const jobKeys = Object.keys(jobs);
-  const lastJob = cwd ? getLastJob(cwd) : undefined;
+  const lastJob = getLastJob();
 
   if (jobKeys.length > 0) {
     // 有预配置的任务：展示列表 + 最近构建状态

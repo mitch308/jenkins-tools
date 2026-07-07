@@ -12,19 +12,17 @@ export function registerRunCommand(program: Command): void {
     .option('-j, --job <job>', '预选任务（跳过任务选择步骤）')
     .action(async (options: { job?: string }) => {
       try {
-        const cwd = process.cwd();
-
         // Step 1: 认证
-        const { config, service, profileName } = await runAuthWizard(cwd);
+        const { config, service, profileName } = await runAuthWizard();
 
         // Step 2: 选择任务
-        const selection = await runJobSelectWizard(config, service, options.job, cwd);
+        const selection = await runJobSelectWizard(config, service, options.job);
 
         // Step 3: 配置参数
-        const params = await runParamsWizard(service, selection.jobName, config, cwd, selection.jobAlias);
+        const params = await runParamsWizard(service, selection.jobName, config, selection.jobAlias);
 
         // Step 4: 提交执行
-        const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile, cwd);
+        const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile);
         if (!result) {
           printError('构建已取消');
         }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Suppress deprecation warnings from transitive dependencies (punycode via jenkins-api → request)
+// Suppress deprecation warnings from transitive dependencies
 process.removeAllListeners('warning');
 
 import { Command } from 'commander';
@@ -26,12 +26,10 @@ program.action(async () => {
   const { printError } = await import('./utils/output.js');
 
   try {
-    const cwd = process.cwd();
-
-    const { config, service, profileName } = await runAuthWizard(cwd);
-    const selection = await runJobSelectWizard(config, service, undefined, cwd);
-    const params = await runParamsWizard(service, selection.jobName, config, cwd, selection.jobAlias);
-    const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile, cwd);
+    const { config, service, profileName } = await runAuthWizard();
+    const selection = await runJobSelectWizard(config, service, undefined);
+    const params = await runParamsWizard(service, selection.jobName, config, selection.jobAlias);
+    const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile);
     if (!result) {
       printError('构建已取消');
     }

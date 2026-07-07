@@ -8,7 +8,6 @@ export async function runExecuteWizard(
   jobName: string,
   params: Record<string, string>,
   serverProfile: string,
-  cwd?: string,
 ): Promise<BuildResult | null> {
   // 1. 展示执行摘要
   const items = [
@@ -52,16 +51,14 @@ export async function runExecuteWizard(
     }
 
     // 4. 记录构建历史
-    if (cwd) {
-      addBuildRecord(cwd, {
-        jobName,
-        buildNumber: result.buildNumber,
-        params: Object.keys(params).length > 0 ? params : undefined,
-        triggeredAt: new Date().toISOString(),
-        server: serverProfile,
-        queueUrl: stripAuthFromUrl(result.queueUrl),
-      });
-    }
+    addBuildRecord({
+      jobName,
+      buildNumber: result.buildNumber,
+      params: Object.keys(params).length > 0 ? params : undefined,
+      triggeredAt: new Date().toISOString(),
+      server: serverProfile,
+      queueUrl: stripAuthFromUrl(result.queueUrl),
+    });
 
     return result;
   } catch (err: any) {

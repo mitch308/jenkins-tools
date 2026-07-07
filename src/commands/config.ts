@@ -14,8 +14,7 @@ export function registerConfigCommand(program: Command): void {
     .command('init')
     .description('初始化配置文件')
     .action(async () => {
-      const cwd = process.cwd();
-      const configPath = findConfigPath(cwd);
+      const configPath = findConfigPath();
 
       if (fs.existsSync(configPath)) {
         printWarning(`配置文件已存在: ${configPath}`);
@@ -53,7 +52,7 @@ export function registerConfigCommand(program: Command): void {
         },
       };
 
-      saveConfig(cwd, config);
+      saveConfig(config);
       printSuccess(`配置文件已创建: ${configPath}`);
 
       // 测试连接
@@ -76,8 +75,7 @@ export function registerConfigCommand(program: Command): void {
     .command('test')
     .description('测试 Jenkins 连接')
     .action(async () => {
-      const cwd = process.cwd();
-      const config = loadConfig(cwd);
+      const config = loadConfig();
       if (!config) {
         printError('未找到配置文件，请先运行 jkt config init');
         process.exit(1);
@@ -103,8 +101,7 @@ export function registerConfigCommand(program: Command): void {
     .command('list')
     .description('列出配置信息')
     .action(() => {
-      const cwd = process.cwd();
-      const config = loadConfig(cwd);
+      const config = loadConfig();
       if (!config) {
         printError('未找到配置文件');
         process.exit(1);

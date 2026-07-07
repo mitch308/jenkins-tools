@@ -1,13 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { HistoryData, HistoryEntry, HistoryMeta, BuildRecord } from './schema.js';
+import { getHistoryPath } from './paths.js';
 
-const HISTORY_FILE = '.jenkins-history.json';
 const MAX_BUILD_RECORDS = 50;
-
-function findHistoryPath(cwd: string): string {
-  return path.resolve(cwd, HISTORY_FILE);
-}
 
 interface HistoryFile {
   meta?: HistoryMeta;
@@ -15,8 +11,8 @@ interface HistoryFile {
   buildRecords?: BuildRecord[];
 }
 
-function loadHistoryFile(cwd: string): HistoryFile {
-  const historyPath = findHistoryPath(cwd);
+function loadHistoryFile(): HistoryFile {
+  const historyPath = getHistoryPath();
   if (!fs.existsSync(historyPath)) {
     return { meta: {}, jobs: {}, buildRecords: [] };
   }
@@ -34,40 +30,39 @@ function loadHistoryFile(cwd: string): HistoryFile {
   }
 }
 
-function saveHistoryFile(cwd: string, data: HistoryFile): void {
-  const historyPath = findHistoryPath(cwd);
+function saveHistoryFile(data: HistoryFile): void {
+  const historyPath = getHistoryPath();
   fs.writeFileSync(historyPath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-export function loadHistory(cwd: string): HistoryData {
-  return loadHistoryFile(cwd).jobs;
+export function loadHistory(): HistoryData {
+  return loadHistoryFile().jobs;
 }
 
-export function saveHistory(cwd: string, jobName: string, params: Record<string, string>): void {
-  const file = loadHistoryFile(cwd);
+export function saveHistory(jobName: string, params: Record<string, string>): void {
+  const file = loadHistoryFile();
   const entry: HistoryEntry = {
     lastParams: params,
     lastRun: new Date().toISOString(),
   };
   file.jobs[jobName] = entry;
   file.meta = { lastJob: jobName };
-  saveHistoryFile(cwd, file);
+  saveHistoryFile(file);
 }
 
-export function getLastJob(cwd: string): string | undefined {
-  return loadHistoryFile(cwd).meta?.lastJob;
+export function getLastJob(): string | undefined {
+  return loadHistoryFile().meta?.lastJob;
 }
 
-export function addBuildRecord(cwd: string, record: BuildRecord): void {
-  const file = loadHistoryFile(cwd);
+export function addBuildRecord(record: BuildRecord): void {
+  const file = loadHistoryFile();
   if (!file.buildRecords) file.buildRecords = [];
   file.buildRecords.unshift(record);
   // Keep only last MAX_BUILD_RECORDS
   file.buildRecords = file.buildRecords.slice(0, MAX_BUILD_RECORDS);
-  saveHistoryFile(cwd, file);
+  saveHistoryFile(file);
 }
 
-export function getBuildRecords(cwd: string, limit = 20): BuildRecord[] {
-  const file = loadHistoryFile(cwd);
-  return (file.buildRecords || []).slice(0, limit);
+export function getBuildRecords(limit = 20): BuildRecord[] {
+  return (loadHistoryFile().buildRecords || []).slice(0, limit);
 }

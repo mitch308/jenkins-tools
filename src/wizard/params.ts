@@ -8,7 +8,6 @@ export async function runParamsWizard(
   service: JenkinsService,
   jobName: string,
   config: AppConfig,
-  cwd: string,
   jobAlias?: string,
 ): Promise<Record<string, string>> {
   // 1. 从 Jenkins 获取参数定义
@@ -35,7 +34,7 @@ export async function runParamsWizard(
   }
 
   // 2. 合并参数值
-  const mergedDefaults = mergeParams(jobInfo.params, config, jobName, cwd, jobAlias);
+  const mergedDefaults = mergeParams(jobInfo.params, config, jobName, jobAlias);
 
   // 3. 逐个展示参数，允许修改
   console.log('\n配置构建参数（回车保留当前值，输入新值修改）：\n');
@@ -65,7 +64,7 @@ export async function runParamsWizard(
   }
 
   // 4. 保存到历史
-  saveHistory(cwd, jobName, finalParams);
+  saveHistory(jobName, finalParams);
 
   return finalParams;
 }
@@ -77,7 +76,6 @@ function mergeParams(
   params: JobParamDef[],
   config: AppConfig,
   jobName: string,
-  cwd: string,
   jobAlias?: string,
 ): Record<string, string> {
   const result: Record<string, string> = {};
@@ -96,7 +94,7 @@ function mergeParams(
   }
 
   // 第三层：历史记录中最近一次的参数
-  const history = loadHistory(cwd);
+  const history = loadHistory();
   const historyEntry = history[jobName];
   if (historyEntry?.lastParams) {
     Object.assign(result, historyEntry.lastParams);

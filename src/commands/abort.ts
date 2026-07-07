@@ -14,8 +14,7 @@ export function registerAbortCommand(program: Command): void {
     .option('-s, --server <profile>', '服务器 Profile 名称')
     .action(async (job: string | undefined, options: { number?: number; server?: string }) => {
       try {
-        const cwd = process.cwd();
-        const config = loadConfig(cwd);
+        const config = loadConfig();
         if (!config) {
           printError('未找到配置文件，请先运行 jkt config init');
           process.exit(1);
@@ -58,7 +57,7 @@ export function registerAbortCommand(program: Command): void {
 
         // 如果只指定了构建号，用上次构建的 job
         if (options.number) {
-          const lastJob = (await import('../config/store.js')).getLastJob(cwd);
+          const lastJob = (await import('../config/store.js')).getLastJob();
           if (!lastJob) {
             printError('请指定 Job 名称：jkt abort <job> -n <buildNumber>');
             process.exit(1);
@@ -68,7 +67,7 @@ export function registerAbortCommand(program: Command): void {
         }
 
         // 展示最近构建记录供选择
-        const records = getBuildRecords(cwd, 20);
+        const records = getBuildRecords(20);
         if (records.length === 0) {
           printInfo('没有本工具触发的构建记录');
           return;

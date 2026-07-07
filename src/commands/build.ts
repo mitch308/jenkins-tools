@@ -13,8 +13,7 @@ export function registerBuildCommand(program: Command): void {
     .option('-p, --param <params...>', '构建参数，格式: KEY=VALUE')
     .action(async (job: string, options: { server?: string; param?: string[] }) => {
       try {
-        const cwd = process.cwd();
-        const config = loadConfig(cwd);
+        const config = loadConfig();
         if (!config) {
           printError('未找到配置文件，请先运行 jkt config init');
           process.exit(1);
@@ -53,7 +52,7 @@ export function registerBuildCommand(program: Command): void {
           }
         } else {
           // 未传 -p 参数，进入参数配置向导
-          params = await runParamsWizard(service, jobName, config, cwd, jobAlias);
+          params = await runParamsWizard(service, jobName, config, jobAlias);
         }
 
         const s = spinner(`正在构建 ${jobName}...`);
@@ -74,7 +73,7 @@ export function registerBuildCommand(program: Command): void {
         }
 
         // 记录构建历史
-        addBuildRecord(cwd, {
+        addBuildRecord({
           jobName,
           buildNumber: result.buildNumber,
           params: Object.keys(params).length > 0 ? params : undefined,
