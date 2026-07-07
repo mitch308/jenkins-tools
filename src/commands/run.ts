@@ -24,7 +24,7 @@ export function registerRunCommand(program: Command): void {
         const params = await runParamsWizard(service, selection.jobName, config, cwd, selection.jobAlias);
 
         // Step 4: 提交执行
-        const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile);
+        const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile, cwd);
         if (!result) {
           printError('构建已取消');
         }

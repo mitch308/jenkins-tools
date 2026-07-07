@@ -32,6 +32,14 @@ export interface HistoryMeta {
   lastJob?: string;
 }
 
+export interface BuildRecord {
+  jobName: string;
+  buildNumber?: number;
+  params?: Record<string, string>;
+  triggeredAt: string;
+  server?: string;
+}
+
 export interface JobParamDef {
   name: string;
   type: string;

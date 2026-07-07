@@ -30,7 +30,7 @@ program.action(async () => {
     const { config, service, profileName } = await runAuthWizard(cwd);
     const selection = await runJobSelectWizard(config, service, undefined, cwd);
     const params = await runParamsWizard(service, selection.jobName, config, cwd, selection.jobAlias);
-    const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile);
+    const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile, cwd);
     if (!result) {
       printError('构建已取消');
     }

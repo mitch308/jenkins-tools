@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { loadConfig } from '../config/loader.js';
 import { JenkinsService } from '../services/jenkins.js';
+import { addBuildRecord } from '../config/store.js';
 import { printSuccess, printError, spinner } from '../utils/output.js';
 
 export function registerBuildCommand(program: Command): void {
@@ -53,6 +54,15 @@ export function registerBuildCommand(program: Command): void {
         s.stop();
 
         printSuccess(`构建已提交！队列地址: ${result.queueUrl || '(已触发)'}`);
+
+        // 记录构建历史
+        addBuildRecord(cwd, {
+          jobName,
+          buildNumber: result.buildNumber,
+          params: Object.keys(params).length > 0 ? params : undefined,
+          triggeredAt: new Date().toISOString(),
+          server: profileName,
+        });
       } catch (err: any) {
         printError(err.message);
         process.exit(1);

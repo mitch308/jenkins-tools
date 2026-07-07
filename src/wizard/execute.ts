@@ -1,12 +1,14 @@
 import type { JenkinsService, BuildResult } from '../services/jenkins.js';
 import { printSuccess, printError, printSummary, spinner } from '../utils/output.js';
 import { confirm } from '../utils/prompt.js';
+import { addBuildRecord } from '../config/store.js';
 
 export async function runExecuteWizard(
   service: JenkinsService,
   jobName: string,
   params: Record<string, string>,
   serverProfile: string,
+  cwd?: string,
 ): Promise<BuildResult | null> {
   // 1. 展示执行摘要
   const items = [
@@ -37,6 +39,18 @@ export async function runExecuteWizard(
     const result = await service.build(jobName, params);
     s.stop();
     printSuccess(`构建已提交！队列地址: ${result.queueUrl || '(已触发)'}`);
+
+    // 4. 记录构建历史
+    if (cwd) {
+      addBuildRecord(cwd, {
+        jobName,
+        buildNumber: result.buildNumber,
+        params: Object.keys(params).length > 0 ? params : undefined,
+        triggeredAt: new Date().toISOString(),
+        server: serverProfile,
+      });
+    }
+
     return result;
   } catch (err: any) {
     s.stop();
