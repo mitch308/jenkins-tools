@@ -64,7 +64,9 @@ jkt status pc-dev --log  # 查看构建日志
 ### 中止/删除任务
 
 ```bash
-jkt abort                # 选择要中止或删除的构建
+jkt abort              # 选择要中止或删除的构建
+jkt abort pc-dev       # 中止/删除指定 Job 的最近构建
+jkt abort pc-dev -n 42 # 中止/删除指定构建号
 ```
 
 - 正在构建的任务 → 中止
@@ -123,6 +125,23 @@ npm run build     # 编译
 npm start         # 运行
 npm link          # 全局安装（开发用）
 ```
+
+## Agent/IDE Skills
+
+安装时自动提示安装 Agent/IDE Skills，支持：
+
+- **Claude Code** → `.claude/commands/jkt-*.md`
+- **Cursor** → `.cursor/rules/jkt.mdc`
+- **Codex** → `AGENTS.md` 追加章节
+- **OpenCode** → `opencode.json` 追加命令
+
+也可手动运行：
+
+```bash
+jkt setup-skills       # 重新选择平台并安装
+```
+
+安装后，Agent 可以通过自然语言触发 Jenkins 操作，如"帮我构建 pc-dev"。
 
 ## License
 

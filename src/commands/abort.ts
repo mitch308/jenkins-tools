@@ -8,11 +8,11 @@ import chalk from 'chalk';
 
 export function registerAbortCommand(program: Command): void {
   program
-    .command('abort')
+    .command('abort [job]')
     .description('中止/删除构建任务')
     .option('-n, --number <buildNumber>', '构建号', parseInt)
     .option('-s, --server <profile>', '服务器 Profile 名称')
-    .action(async (options: { number?: number; server?: string }) => {
+    .action(async (job: string | undefined, options: { number?: number; server?: string }) => {
       try {
         const cwd = process.cwd();
         const config = loadConfig(cwd);
@@ -30,11 +30,37 @@ export function registerAbortCommand(program: Command): void {
 
         const service = new JenkinsService(profile);
 
-        // 如果指定了构建号，需要配合 job 名称
+        // 解析 job 别名
+        let jobName = job;
+        if (job && config.jobs?.[job]) {
+          jobName = config.jobs[job].name;
+        }
+
+        // 如果指定了 job 和构建号，直接操作
+        if (jobName && options.number) {
+          await abortOrDelete(service, jobName, options.number);
+          return;
+        }
+
+        // 如果指定了 job 但没有构建号，查询该 job 最近构建
+        if (jobName) {
+          const s = spinner(`查询 ${jobName} 最近构建...`);
+          s.start();
+          const buildNumber = await service.getLastBuildNumber(jobName);
+          s.stop();
+          if (!buildNumber) {
+            printInfo(`${jobName} 没有构建记录`);
+            return;
+          }
+          await abortOrDelete(service, jobName, buildNumber);
+          return;
+        }
+
+        // 如果只指定了构建号，用上次构建的 job
         if (options.number) {
           const lastJob = (await import('../config/store.js')).getLastJob(cwd);
           if (!lastJob) {
-            printError('请指定 Job 名称：jkt abort --number <N> 需要配合最近构建记录');
+            printError('请指定 Job 名称：jkt abort <job> -n <buildNumber>');
             process.exit(1);
           }
           await abortOrDelete(service, lastJob, options.number);

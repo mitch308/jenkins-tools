@@ -36,3 +36,5 @@ Interactive Jenkins CLI tool (`jkt`) built with TypeScript ESM (Node16 module re
 - **Jenkins URLs**: Never expose URLs with embedded credentials (`user:pass@host`) in user-facing output. Use `stripAuthFromUrl()` to clean them.
 - **XML parameter parsing** (`parseParamsFromXml`): Parses parameters in XML document order (not by type) to preserve the order shown in Jenkins. The regex matches all parameter tag types in a single pass.
 - **Build record tracking**: Every build triggered via `jkt` or `jkt build` is recorded in `buildRecords[]` in the history file. This feeds the `jkt status` and `jkt abort` commands.
+- **Skill installer** (`src/setup-skills.ts`): Triggered by npm `postinstall`. Installs agent/IDE skill files (Claude Code, Cursor, Codex, OpenCode) to the user's project. Skills are in `src/skills/` and copied to `dist/skills/` during build. Idempotent via `<!-- jkt-skills -->` markers.
+- **Build script**: `npm run build` compiles TypeScript then copies `src/skills/` to `dist/skills/` (non-TS assets).

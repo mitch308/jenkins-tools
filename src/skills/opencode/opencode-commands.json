@@ -1,0 +1,24 @@
+{
+  "commands": [
+    {
+      "name": "jkt-build",
+      "description": "触发 Jenkins 构建",
+      "command": "jkt build ${job} ${params}"
+    },
+    {
+      "name": "jkt-status",
+      "description": "查询 Jenkins 构建状态",
+      "command": "jkt status ${job:-}"
+    },
+    {
+      "name": "jkt-abort",
+      "description": "中止或删除 Jenkins 构建",
+      "command": "jkt abort"
+    },
+    {
+      "name": "jkt-config",
+      "description": "管理 Jenkins CLI 配置",
+      "command": "jkt config ${action}"
+    }
+  ]
+}
