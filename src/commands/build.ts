@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { loadConfig } from '../config/loader.js';
 import { JenkinsService } from '../services/jenkins.js';
 import { addBuildRecord } from '../config/store.js';
+import { runParamsWizard } from '../wizard/params.js';
 import { printSuccess, printError, spinner } from '../utils/output.js';
 
 export function registerBuildCommand(program: Command): void {
@@ -26,9 +27,20 @@ export function registerBuildCommand(program: Command): void {
           process.exit(1);
         }
 
+        // 如果 job 是别名，解析为实际路径
+        let jobName = job;
+        let jobAlias: string | undefined;
+        if (config.jobs?.[job]) {
+          jobName = config.jobs[job].name;
+          jobAlias = job;
+        }
+
+        const service = new JenkinsService(profile);
+
         // 解析参数
-        const params: Record<string, string> = {};
-        if (options.param) {
+        let params: Record<string, string> = {};
+        if (options.param && options.param.length > 0) {
+          // 通过 -p 传入的参数
           for (const p of options.param) {
             const eqIndex = p.indexOf('=');
             if (eqIndex === -1) {
@@ -39,15 +51,11 @@ export function registerBuildCommand(program: Command): void {
             const value = p.substring(eqIndex + 1);
             params[key] = value;
           }
+        } else {
+          // 未传 -p 参数，进入参数配置向导
+          params = await runParamsWizard(service, jobName, config, cwd, jobAlias);
         }
 
-        // 如果 job 是别名，解析为实际路径
-        let jobName = job;
-        if (config.jobs?.[job]) {
-          jobName = config.jobs[job].name;
-        }
-
-        const service = new JenkinsService(profile);
         const s = spinner(`正在构建 ${jobName}...`);
         s.start();
         const result = await service.build(jobName, Object.keys(params).length > 0 ? params : undefined);
