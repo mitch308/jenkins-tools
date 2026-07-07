@@ -1,10 +1,4 @@
-#!/usr/bin/env node
-
-// Suppress deprecation warnings from transitive dependencies
-process.removeAllListeners('warning');
-
 import { Command } from 'commander';
-import { registerRunCommand } from './commands/run.js';
 import { registerBuildCommand } from './commands/build.js';
 import { registerStatusCommand } from './commands/status.js';
 import { registerAbortCommand } from './commands/abort.js';
@@ -15,10 +9,11 @@ const program = new Command();
 program
   .name('jkt')
   .description('Interactive Jenkins CLI tool')
-  .version('0.1.0');
+  .version('0.1.0')
+  .option('-j, --job <job>', '预选任务（跳过任务选择步骤）');
 
 // 默认命令：启动向导
-program.action(async () => {
+program.action(async (options: { job?: string }) => {
   const { runAuthWizard } = await import('./wizard/auth.js');
   const { runJobSelectWizard } = await import('./wizard/job-select.js');
   const { runParamsWizard } = await import('./wizard/params.js');
@@ -27,7 +22,7 @@ program.action(async () => {
 
   try {
     const { config, service, profileName } = await runAuthWizard();
-    const selection = await runJobSelectWizard(config, service, undefined);
+    const selection = await runJobSelectWizard(config, service, options.job);
     const params = await runParamsWizard(service, selection.jobName, config, selection.jobAlias);
     const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile);
     if (!result) {
@@ -39,7 +34,6 @@ program.action(async () => {
   }
 });
 
-registerRunCommand(program);
 registerBuildCommand(program);
 registerStatusCommand(program);
 registerAbortCommand(program);

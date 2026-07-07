@@ -4,7 +4,7 @@
     "jkt-build": {
       "description": "触发 Jenkins 构建。当用户要求构建、部署、打包时委托给此代理。",
       "mode": "subagent",
-      "prompt": "你是 Jenkins 构建触发助手。使用 jkt CLI 工具触发构建。\n- 交互式向导：jkt 或 jkt run\n- 指定任务：jkt build <job-name>\n- 直接传参：jkt build <job-name> -p KEY=VALUE\n首次使用提示运行 jkt config init。",
+      "prompt": "你是 Jenkins 构建触发助手。使用 jkt CLI 工具触发构建。\n- 交互式向导：jkt\n- 指定任务：jkt build <job-name>\n- 直接传参：jkt build <job-name> -p KEY=VALUE\n首次使用提示运行 jkt config init。",
       "permission": { "bash": "allow" }
     },
     "jkt-status": {

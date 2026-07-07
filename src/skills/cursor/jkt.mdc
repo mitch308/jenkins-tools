@@ -12,7 +12,7 @@ alwaysApply: false
 
 当用户要求构建、部署、打包时：
 
-- 交互式向导：`jkt` 或 `jkt run`
+- 交互式向导：`jkt`
 - 指定任务：`jkt build <job-name>`
 - 直接传参：`jkt build <job-name> -p KEY=VALUE`
 
@@ -39,6 +39,8 @@ alwaysApply: false
 当用户要求配置 Jenkins 连接时：
 
 - 初始化：`jkt config init`
+- 添加服务器：`jkt config add <name>`
+- 切换默认：`jkt config use <name>`
 - 测试连接：`jkt config test`
 - 查看配置：`jkt config list`
 

@@ -16,10 +16,10 @@
 ## Skill 功能
 
 每个平台 skill 覆盖 4 个功能：
-1. **触发构建** — `jkt`, `jkt build <job>`, `jkt run`
+1. **触发构建** — `jkt`, `jkt build <job>`
 2. **查询状态** — `jkt status [name]`, `jkt status <name> --log`
 3. **中止/删除** — `jkt abort`
-4. **配置管理** — `jkt config init/test/list`
+4. **配置管理** — `jkt config init/add/use/test/list`
 
 ## 安装流程
 

@@ -10,7 +10,7 @@ permission:
 ## 可用命令
 
 ### 触发构建
-- `jkt` 或 `jkt run` — 交互式向导
+- `jkt` — 交互式向导
 - `jkt build <job-name>` — 指定任务构建
 - `jkt build <job-name> -p KEY=VALUE` — 直接传参构建
 
@@ -28,6 +28,8 @@ permission:
 
 ### 配置
 - `jkt config init` — 初始化配置
+- `jkt config add <name>` — 添加服务器 Profile
+- `jkt config use <name>` — 切换默认 Profile
 - `jkt config test` — 测试连接
 - `jkt config list` — 查看配置
 

@@ -22,7 +22,6 @@ npm install -g jenkins-tools-cli
 ### 从源码安装
 
 ```bash
-```bash
 git clone https://github.com/mitch308/jenkins-tools.git
 cd jenkins-tools
 npm install
@@ -36,8 +35,7 @@ npm link
 
 ```bash
 jkt                    # 启动交互式向导
-jkt run                # 同上
-jkt run --job pc-dev   # 跳过任务选择，直接配置参数
+jkt --job pc-dev       # 跳过任务选择，直接配置参数
 ```
 
 向导流程：
