@@ -53,8 +53,10 @@ export interface QueueItemInfo {
 export class JenkinsService {
   private baseUrl: string;
   private authHeader: string;
+  private crumb: { field: string; value: string } | null = null;
+  private cookies: string[] = [];
 
-  constructor(private profile: ServerProfile) {
+  constructor(profile: ServerProfile) {
     this.baseUrl = profile.url.replace(/\/+$/, '');
 
     if (!profile.token && !profile.password) {
@@ -65,25 +67,69 @@ export class JenkinsService {
     this.authHeader = 'Basic ' + Buffer.from(`${profile.username}:${secret}`).toString('base64');
   }
 
+  /**
+   * Fetch CSRF crumb from Jenkins. Required for POST requests
+   * when Jenkins has CSRF protection enabled.
+   * Cached after first fetch; also captures session cookies.
+   */
+  private async getCrumb(): Promise<{ field: string; value: string } | null> {
+    if (this.crumb) return this.crumb;
+    try {
+      const { statusCode, body } = await this.request('/crumbIssuer/api/json');
+      if (statusCode === 200) {
+        const data = JSON.parse(body) as { crumbRequestField: string; crumb: string };
+        this.crumb = { field: data.crumbRequestField, value: data.crumb };
+        return this.crumb;
+      }
+    } catch {
+      // Crumb issuer not available (CSRF protection disabled)
+    }
+    return null;
+  }
+
   // ── Low-level HTTP helpers ──────────────────────────────────────
 
-  private async request(path: string, options?: { method?: string; body?: string; contentType?: string }): Promise<{ statusCode: number; headers: Record<string, string | string[] | undefined>; body: string }> {
+  private async request(path: string, options?: { method?: string; body?: string; contentType?: string; extraHeaders?: Record<string, string> }): Promise<{ statusCode: number; headers: Record<string, string | string[] | undefined>; body: string }> {
     const url = new URL(path, this.baseUrl);
     const lib = url.protocol === 'https:' ? https : http;
+
+    const headers: Record<string, string> = {
+      Authorization: this.authHeader,
+      ...(this.cookies.length > 0 ? { Cookie: this.cookies.join('; ') } : {}),
+      ...(options?.contentType ? { 'Content-Type': options.contentType } : {}),
+      ...(options?.extraHeaders || {}),
+    };
 
     return new Promise((resolve, reject) => {
       const req = lib.request(url, {
         method: options?.method || 'GET',
-        headers: {
-          Authorization: this.authHeader,
-          ...(options?.contentType ? { 'Content-Type': options.contentType } : {}),
-        },
+        headers,
       }, (res) => {
+        // Collect Set-Cookie headers
+        const setCookies = res.headers['set-cookie'];
+        if (setCookies) {
+          for (const c of setCookies) {
+            const cookieName = c.split('=')[0];
+            // Replace existing cookie with same name, or add new
+            const idx = this.cookies.findIndex(existing => existing.startsWith(cookieName + '='));
+            if (idx >= 0) {
+              this.cookies[idx] = c.split(';')[0];
+            } else {
+              this.cookies.push(c.split(';')[0]);
+            }
+          }
+        }
+
         // Follow redirects
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           const redirectUrl = new URL(res.headers.location, this.baseUrl).toString();
           const redirectLib = redirectUrl.startsWith('https') ? https : http;
-          redirectLib.get(redirectUrl, { headers: { Authorization: this.authHeader } }, (redirectRes) => {
+          const redirectHeaders: Record<string, string> = {
+            Authorization: this.authHeader,
+            ...(this.cookies.length > 0 ? { Cookie: this.cookies.join('; ') } : {}),
+            ...(options?.extraHeaders || {}),
+          };
+          redirectLib.get(redirectUrl, { headers: redirectHeaders }, (redirectRes) => {
             let body = '';
             redirectRes.on('data', (chunk: Buffer) => { body += chunk.toString(); });
             redirectRes.on('end', () => resolve({ statusCode: redirectRes.statusCode || 0, headers: redirectRes.headers as any, body }));
@@ -123,7 +169,12 @@ export class JenkinsService {
   }
 
   private async post(path: string, body?: string, contentType?: string): Promise<{ statusCode: number; headers: Record<string, string | string[] | undefined> }> {
-    const result = await this.request(path, { method: 'POST', body, contentType });
+    const crumb = await this.getCrumb();
+    const extraHeaders: Record<string, string> = {};
+    if (crumb) {
+      extraHeaders[crumb.field] = crumb.value;
+    }
+    const result = await this.request(path, { method: 'POST', body, contentType, extraHeaders });
     return { statusCode: result.statusCode, headers: result.headers };
   }
 
