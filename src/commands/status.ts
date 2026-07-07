@@ -133,6 +133,9 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
       if (b.queued) {
         statusIcon = chalk.magenta('⏳ 排队中');
         numberLabel = b.number ? chalk.bold(`#${b.number}`) : chalk.bold(`queue#${b.queueId}`);
+      } else if (b.pending) {
+        statusIcon = chalk.blue('⏳ 待执行');
+        numberLabel = chalk.bold(`#${b.number}`);
       } else if (b.building) {
         statusIcon = chalk.yellow('⏳ 构建中');
         numberLabel = chalk.bold(`#${b.number}`);

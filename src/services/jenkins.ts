@@ -38,6 +38,7 @@ export interface BuildSummary {
   queueId?: number;
   queueWhy?: string;
   params?: Record<string, string>;
+  pending?: boolean;
 }
 
 export interface QueueItemInfo {
@@ -458,6 +459,8 @@ export class JenkinsService {
             userId,
             userName,
             params: Object.keys(params).length > 0 ? params : undefined,
+            // Pending: build number assigned but not yet started (result=null, building=false)
+            pending: b.result === null && !b.building,
           };
         });
       }
@@ -465,8 +468,11 @@ export class JenkinsService {
       // Job API not available, return only queued items
     }
 
-    // 3. Merge: queued items first, then builds, truncate to limit
-    const merged = [...queuedItems, ...builds].slice(0, limit);
+    // 3. Merge: queued items first, then builds (dedup by buildNumber)
+    // If a queued item already has a buildNumber, don't show it again from builds
+    const queuedNumbers = new Set(queuedItems.filter(q => q.number > 0).map(q => q.number));
+    const dedupedBuilds = builds.filter(b => !queuedNumbers.has(b.number));
+    const merged = [...queuedItems, ...dedupedBuilds].slice(0, limit);
     return merged;
   }
 
