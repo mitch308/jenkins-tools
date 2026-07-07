@@ -1,21 +1,39 @@
 {
-  "name": "jenkins-tools",
+  "name": "jenkins-tools-cli",
   "version": "0.1.0",
   "description": "Interactive Jenkins CLI tool with step-by-step build configuration",
   "type": "module",
   "bin": {
     "jkt": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build",
+    "prepack": "npm run build"
   },
   "keywords": [
     "jenkins",
-    "cli"
+    "cli",
+    "jenkins-cli",
+    "ci-cd",
+    "build",
+    "deploy",
+    "automation"
   ],
+  "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
