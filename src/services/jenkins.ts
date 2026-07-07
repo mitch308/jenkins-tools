@@ -274,46 +274,65 @@ export class JenkinsService {
 
   /**
    * Find a queued item by job name (and optionally buildNumber) from the Jenkins queue.
-   * Returns the queue item info if found, null otherwise.
+   * Uses nextBuildNumber to assign build numbers to queued items that don't yet
+   * have executable.number assigned.
    *
-   * When buildNumber is specified:
-   * - If executable.number is assigned and matches → return it
-   * - If executable is null (not yet assigned) → return it (might be this build)
-   * - If executable.number is assigned but doesn't match → skip
+   * Build number assignment for queued items:
+   * - Items with executable.number already set → use it
+   * - Items without executable.number → assigned sequentially starting from nextBuildNumber
+   *
+   * Returns the queue item info if found, null otherwise.
    */
   async findQueuedItem(jobName: string, buildNumber?: number): Promise<QueueItemInfo | null> {
     try {
-      const data = await this.getJson<any>('/queue/api/json');
-      const items = data.items || [];
-      for (const item of items) {
-        if (item.task?.name === jobName) {
-          const itemBuildNumber = item.executable?.number;
-          if (buildNumber !== undefined) {
-            // executable not yet assigned → could be this build, return it
-            if (itemBuildNumber === undefined) {
-              return {
-                id: item.id,
-                buildNumber: undefined,
-                jobName: item.task.name,
-                why: item.why,
-                stuck: item.stuck ?? false,
-                cancelled: item.cancelled ?? false,
-              };
-            }
-            // executable assigned but doesn't match → skip
-            if (itemBuildNumber !== buildNumber) {
-              continue;
-            }
-          }
-          return {
-            id: item.id,
-            buildNumber: itemBuildNumber,
-            jobName: item.task.name,
-            why: item.why,
-            stuck: item.stuck ?? false,
-            cancelled: item.cancelled ?? false,
-          };
+      const [queueData, jobData] = await Promise.all([
+        this.getJson<any>('/queue/api/json'),
+        this.getJson<any>(`/job/${encodeURIComponent(jobName)}/api/json?tree=nextBuildNumber`),
+      ]);
+
+      const items = queueData.items || [];
+      const nextBuildNumber = jobData.nextBuildNumber;
+
+      // Collect all queued items for this job
+      const jobItems = items.filter((item: any) => item.task?.name === jobName && !item.cancelled);
+
+      // Assign build numbers: items with executable.number use it;
+      // items without get assigned from nextBuildNumber sequentially
+      const assignedNumbers = new Set<number>();
+      // First pass: collect already-assigned numbers
+      for (const item of jobItems) {
+        if (item.executable?.number) {
+          assignedNumbers.add(item.executable.number);
         }
+      }
+      // Second pass: assign numbers to items without executable
+      let nextAssignable = nextBuildNumber;
+      for (const item of jobItems) {
+        if (!item.executable?.number) {
+          // Find next available number starting from nextBuildNumber
+          while (assignedNumbers.has(nextAssignable)) {
+            nextAssignable++;
+          }
+          item._assignedBuildNumber = nextAssignable;
+          assignedNumbers.add(nextAssignable);
+          nextAssignable++;
+        }
+      }
+
+      // Find matching item
+      for (const item of jobItems) {
+        const itemBuildNumber = item.executable?.number ?? item._assignedBuildNumber;
+        if (buildNumber !== undefined && itemBuildNumber !== buildNumber) {
+          continue;
+        }
+        return {
+          id: item.id,
+          buildNumber: itemBuildNumber,
+          jobName: item.task.name,
+          why: item.why,
+          stuck: item.stuck ?? false,
+          cancelled: item.cancelled ?? false,
+        };
       }
       return null;
     } catch {
@@ -400,44 +419,70 @@ export class JenkinsService {
    * Queued items appear at the top with queued=true.
    */
   async getRecentBuilds(jobName: string, limit: number = 10): Promise<BuildSummary[]> {
-    // 1. Get queued items for this job
+    // 1. Get queued items for this job (with nextBuildNumber for number assignment)
     let queuedItems: BuildSummary[] = [];
     try {
-      const queueData = await this.getJson<any>('/queue/api/json?tree=items[id,task[name],executable[number],inQueueSince,why,cancelled,actions[causes[userId,userName],parameters[name,value]]]');
+      const [queueData, jobData] = await Promise.all([
+        this.getJson<any>('/queue/api/json?tree=items[id,task[name],executable[number],inQueueSince,why,cancelled,actions[causes[userId,userName],parameters[name,value]]]'),
+        this.getJson<any>(`/job/${encodeURIComponent(jobName)}/api/json?tree=nextBuildNumber`),
+      ]);
+      const nextBuildNumber = jobData.nextBuildNumber;
       const items = queueData.items || [];
-      for (const item of items) {
-        if (item.task?.name === jobName && !item.cancelled) {
-          // Extract trigger user from actions.causes
-          let userName: string | undefined;
-          // Extract build parameters from actions.parameters
-          const params: Record<string, string> = {};
-          for (const action of item.actions || []) {
-            for (const cause of action.causes || []) {
-              if (cause.userName) {
-                userName = cause.userName;
-                break;
-              }
-            }
-            for (const param of action.parameters || []) {
-              if (param.name && param.value !== undefined) {
-                params[param.name] = String(param.value);
-              }
+
+      // Collect queued items for this job
+      const jobQueueItems = items.filter((item: any) => item.task?.name === jobName && !item.cancelled);
+
+      // Assign build numbers using nextBuildNumber
+      const assignedNumbers = new Set<number>();
+      for (const item of jobQueueItems) {
+        if (item.executable?.number) {
+          assignedNumbers.add(item.executable.number);
+        }
+      }
+      let nextAssignable = nextBuildNumber;
+      for (const item of jobQueueItems) {
+        if (!item.executable?.number) {
+          while (assignedNumbers.has(nextAssignable)) {
+            nextAssignable++;
+          }
+          item._assignedBuildNumber = nextAssignable;
+          assignedNumbers.add(nextAssignable);
+          nextAssignable++;
+        }
+      }
+
+      for (const item of jobQueueItems) {
+        // Extract trigger user from actions.causes
+        let userName: string | undefined;
+        // Extract build parameters from actions.parameters
+        const params: Record<string, string> = {};
+        for (const action of item.actions || []) {
+          for (const cause of action.causes || []) {
+            if (cause.userName) {
+              userName = cause.userName;
+              break;
             }
           }
-          queuedItems.push({
-            number: item.executable?.number ?? 0,
-            result: null,
-            building: false,
-            url: `${this.baseUrl}/queue/item/${item.id}/`,
-            timestamp: item.inQueueSince ?? Date.now(),
-            duration: 0,
-            queued: true,
-            queueId: item.id,
-            queueWhy: item.why,
-            userName,
-            params: Object.keys(params).length > 0 ? params : undefined,
-          });
+          for (const param of action.parameters || []) {
+            if (param.name && param.value !== undefined) {
+              params[param.name] = String(param.value);
+            }
+          }
         }
+        const itemBuildNumber = item.executable?.number ?? item._assignedBuildNumber ?? 0;
+        queuedItems.push({
+          number: itemBuildNumber,
+          result: null,
+          building: false,
+          url: `${this.baseUrl}/queue/item/${item.id}/`,
+          timestamp: item.inQueueSince ?? Date.now(),
+          duration: 0,
+          queued: true,
+          queueId: item.id,
+          queueWhy: item.why,
+          userName,
+          params: Object.keys(params).length > 0 ? params : undefined,
+        });
       }
     } catch {
       // Queue API not available, skip
