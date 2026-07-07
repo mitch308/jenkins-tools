@@ -1,6 +1,6 @@
 {
   "name": "jenkins-tools-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Interactive Jenkins CLI tool with step-by-step build configuration",
   "type": "module",
   "bin": {
@@ -32,7 +32,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/mitch308/jenkins-tools.git"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -34,8 +34,9 @@ jkt abort <job-name>
 
 | 构建状态 | 操作 |
 |----------|------|
-| 构建中 | 中止（stop） |
 | 排队中 | 取消排队（cancelQueue） |
+| 待执行 | 取消排队（cancelQueue） |
+| 构建中 | 中止（stop） |
 | 已完成 | 可选择删除（delete from Jenkins） |
 
 ## 注意事项

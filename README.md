@@ -8,7 +8,7 @@
 - 🔍 **任务搜索** — 从 Jenkins 搜索并选择任务，自动显示最近构建状态
 - 📋 **参数记忆** — 自动合并 Jenkins 默认值、配置文件预设和上次使用的参数
 - ✅ **选择类型参数** — 自动识别 Choice/Radio 类型参数，提供选项列表
-- 📊 **构建状态** — 查看最近构建记录及实时状态，支持查看指定 Job 的最近 N 次构建历史
+- 📊 **构建状态** — 查看最近构建记录及实时状态，支持查看指定 Job 的最近 N 次构建历史（含排队中/待执行任务及参数信息）
 - 🛑 **中止/删除** — 中止正在运行的任务、取消排队中的构建或删除已完成任务
 
 ## 安装
@@ -22,7 +22,8 @@ npm install -g jenkins-tools-cli
 ### 从源码安装
 
 ```bash
-git clone <repo-url>
+```bash
+git clone https://github.com/mitch308/jenkins-tools.git
 cd jenkins-tools
 npm install
 npm run build
@@ -57,10 +58,22 @@ jkt build pc-dev -p branch=main -p ENV=prod  # 直接传参构建
 ```bash
 jkt status               # 显示最近由本工具触发的构建记录
 jkt status pc-dev        # 查询指定 Job 的最近构建状态
-jkt status pc-dev -n 42  # 查询指定构建号
-jkt status pc-dev -r 10  # 查看最近 10 次构建记录
+jkt status pc-dev -n 42  # 查询指定构建号（支持排队中/待执行状态）
+jkt status pc-dev -r 10  # 查看最近 10 次构建记录（含排队中任务及参数）
 jkt status pc-dev --log  # 查看构建日志
 ```
+
+构建状态图标：
+
+| 图标 | 含义 |
+|------|------|
+| ⏳ 排队中 | 在队列中等待执行器 |
+| ⏳ 待执行 | 已分配构建号，等待执行器启动 |
+| ⏳ 构建中 | 正在执行 |
+| ✔ | 成功 |
+| ✖ | 失败 |
+| ⊘ | 中止 |
+| ⚠ | 不稳定 |
 
 ### 中止/删除任务
 
@@ -152,6 +165,8 @@ jkt setup-skills       # 重新选择平台并安装
 ```
 
 安装后，Agent 可以通过自然语言触发 Jenkins 操作，如"帮我构建 pc-dev"。
+
+> ⚠️ **注意**：Agent/IDE Skills 功能尚未经过完整测试验证，各平台兼容性可能存在问题，欢迎反馈。
 
 ## License
 
