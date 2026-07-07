@@ -275,6 +275,11 @@ export class JenkinsService {
   /**
    * Find a queued item by job name (and optionally buildNumber) from the Jenkins queue.
    * Returns the queue item info if found, null otherwise.
+   *
+   * When buildNumber is specified:
+   * - If executable.number is assigned and matches → return it
+   * - If executable is null (not yet assigned) → return it (might be this build)
+   * - If executable.number is assigned but doesn't match → skip
    */
   async findQueuedItem(jobName: string, buildNumber?: number): Promise<QueueItemInfo | null> {
     try {
@@ -283,9 +288,22 @@ export class JenkinsService {
       for (const item of items) {
         if (item.task?.name === jobName) {
           const itemBuildNumber = item.executable?.number;
-          // If buildNumber specified, match it; otherwise return first match
-          if (buildNumber !== undefined && itemBuildNumber !== buildNumber) {
-            continue;
+          if (buildNumber !== undefined) {
+            // executable not yet assigned → could be this build, return it
+            if (itemBuildNumber === undefined) {
+              return {
+                id: item.id,
+                buildNumber: undefined,
+                jobName: item.task.name,
+                why: item.why,
+                stuck: item.stuck ?? false,
+                cancelled: item.cancelled ?? false,
+              };
+            }
+            // executable assigned but doesn't match → skip
+            if (itemBuildNumber !== buildNumber) {
+              continue;
+            }
           }
           return {
             id: item.id,
