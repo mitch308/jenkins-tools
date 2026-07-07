@@ -248,7 +248,7 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
 
     const s2 = spinner('查询队列...');
     s2.start();
-    const queued = await service.findQueuedItem(jobName);
+    const queued = await service.findQueuedItem(jobName, buildNumber);
     s2.stop();
 
     if (queued && !queued.cancelled) {

@@ -273,18 +273,23 @@ export class JenkinsService {
   }
 
   /**
-   * Find a queued item by job name from the Jenkins queue.
+   * Find a queued item by job name (and optionally buildNumber) from the Jenkins queue.
    * Returns the queue item info if found, null otherwise.
    */
-  async findQueuedItem(jobName: string): Promise<QueueItemInfo | null> {
+  async findQueuedItem(jobName: string, buildNumber?: number): Promise<QueueItemInfo | null> {
     try {
       const data = await this.getJson<any>('/queue/api/json');
       const items = data.items || [];
       for (const item of items) {
         if (item.task?.name === jobName) {
+          const itemBuildNumber = item.executable?.number;
+          // If buildNumber specified, match it; otherwise return first match
+          if (buildNumber !== undefined && itemBuildNumber !== buildNumber) {
+            continue;
+          }
           return {
             id: item.id,
-            buildNumber: item.executable?.number,
+            buildNumber: itemBuildNumber,
             jobName: item.task.name,
             why: item.why,
             stuck: item.stuck ?? false,

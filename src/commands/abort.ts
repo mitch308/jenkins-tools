@@ -106,7 +106,7 @@ export function registerAbortCommand(program: Command): void {
               }
               if (!isQueued) {
                 try {
-                  const queued = await service.findQueuedItem(r.jobName);
+                  const queued = await service.findQueuedItem(r.jobName, r.buildNumber);
                   if (queued) isQueued = true;
                 } catch { /* ignore */ }
               }
