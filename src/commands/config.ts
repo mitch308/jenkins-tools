@@ -3,6 +3,7 @@ import { loadConfig, saveConfig, findConfigPath } from '../config/loader.js';
 import { JenkinsService } from '../services/jenkins.js';
 import { printSuccess, printError, printInfo, printWarning, spinner } from '../utils/output.js';
 import { input, password, select, confirm } from '../utils/prompt.js';
+import { promptProfileDetails } from '../wizard/auth.js';
 import type { AppConfig, ServerProfile } from '../config/schema.js';
 import fs from 'node:fs';
 import chalk from 'chalk';
@@ -95,6 +96,76 @@ export function registerConfigCommand(program: Command): void {
         printError('连接失败');
         process.exit(1);
       }
+    });
+
+  configCmd
+    .command('add <name>')
+    .description('添加服务器 Profile')
+    .action(async (name: string) => {
+      const config = loadConfig();
+      if (!config) {
+        printError('未找到配置文件，请先运行 jkt config init');
+        process.exit(1);
+      }
+
+      if (config.servers.profiles[name]) {
+        printWarning(`Profile "${name}" 已存在: ${config.servers.profiles[name].url}`);
+        const overwrite = await confirm('是否覆盖？');
+        if (!overwrite) {
+          return;
+        }
+      }
+
+      console.log(`\n添加服务器 Profile "${name}"：\n`);
+
+      const profile = await promptProfileDetails();
+      config.servers.profiles[name] = profile;
+
+      // 询问是否设为默认
+      const setDefault = await confirm('是否设为默认 Profile？', name === 'default');
+      if (setDefault) {
+        config.servers.default = name;
+      }
+
+      saveConfig(config);
+      printSuccess(`Profile "${name}" 已保存`);
+
+      // 测试连接
+      const testNow = await confirm('是否测试连接？', true);
+      if (testNow) {
+        const service = new JenkinsService(profile);
+        const s = spinner('验证 Jenkins 连接...');
+        s.start();
+        const ok = await service.testConnection();
+        s.stop();
+        if (ok) {
+          printSuccess('连接成功！');
+        } else {
+          printError('连接失败，请检查配置');
+        }
+      }
+    });
+
+  configCmd
+    .command('use <name>')
+    .description('切换默认服务器 Profile')
+    .action((name: string) => {
+      const config = loadConfig();
+      if (!config) {
+        printError('未找到配置文件，请先运行 jkt config init');
+        process.exit(1);
+      }
+
+      const profile = config.servers.profiles[name];
+      if (!profile) {
+        printError(`Profile "${name}" 不存在`);
+        printInfo(`可用的 Profile: ${Object.keys(config.servers.profiles).join(', ')}`);
+        process.exit(1);
+      }
+
+      config.servers.default = name;
+      saveConfig(config);
+      printSuccess(`默认 Profile 已切换为 "${name}" (${profile.url})`);
     });
 
   configCmd

@@ -90,9 +90,11 @@ jkt abort pc-dev -n 42 # 中止/删除指定构建号
 ### 配置管理
 
 ```bash
-jkt config init    # 交互式初始化配置文件
-jkt config test    # 测试 Jenkins 连接
-jkt config list    # 列出服务器和任务配置
+jkt config init          # 交互式初始化配置文件
+jkt config add staging   # 交互式添加新的服务器 Profile
+jkt config use staging   # 切换默认服务器 Profile
+jkt config test          # 测试 Jenkins 连接
+jkt config list          # 列出服务器和任务配置
 ```
 
 ## 配置

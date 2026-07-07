@@ -135,7 +135,7 @@ async function newProfile(): Promise<AuthResult> {
   process.exit(1);
 }
 
-async function promptProfileDetails(defaultUrl?: string): Promise<ServerProfile> {
+export async function promptProfileDetails(defaultUrl?: string): Promise<ServerProfile> {
   const url = await input('Jenkins URL:', defaultUrl || 'https://jenkins.example.com');
   const username = await input('用户名:');
   const authType = await select('认证方式:', [
