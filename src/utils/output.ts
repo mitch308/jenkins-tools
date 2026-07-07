@@ -41,3 +41,18 @@ export function printSummary(title: string, items: Array<{ label: string; value:
 export function spinner(text: string): Ora {
   return ora({ text, spinner: 'dots' });
 }
+
+/**
+ * Strip embedded credentials from a URL.
+ * http://user:pass@host/path → http://host/path
+ */
+export function stripAuthFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = '';
+    parsed.password = '';
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}

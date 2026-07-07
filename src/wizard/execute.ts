@@ -1,22 +1,7 @@
 import type { JenkinsService, BuildResult } from '../services/jenkins.js';
-import { printSuccess, printError, printSummary, spinner } from '../utils/output.js';
+import { printSuccess, printError, printSummary, spinner, stripAuthFromUrl } from '../utils/output.js';
 import { confirm } from '../utils/prompt.js';
 import { addBuildRecord } from '../config/store.js';
-
-/**
- * Strip embedded credentials from a URL.
- * http://user:pass@host/path → http://host/path
- */
-function stripAuthFromUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    parsed.username = '';
-    parsed.password = '';
-    return parsed.toString();
-  } catch {
-    return url;
-  }
-}
 
 export async function runExecuteWizard(
   service: JenkinsService,

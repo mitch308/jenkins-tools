@@ -3,18 +3,7 @@ import { loadConfig } from '../config/loader.js';
 import { JenkinsService } from '../services/jenkins.js';
 import { addBuildRecord } from '../config/store.js';
 import { runParamsWizard } from '../wizard/params.js';
-import { printSuccess, printError, spinner } from '../utils/output.js';
-
-function stripAuthFromUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    parsed.username = '';
-    parsed.password = '';
-    return parsed.toString();
-  } catch {
-    return url;
-  }
-}
+import { printSuccess, printError, spinner, stripAuthFromUrl } from '../utils/output.js';
 
 export function registerBuildCommand(program: Command): void {
   program
