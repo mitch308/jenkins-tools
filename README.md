@@ -1,10 +1,29 @@
-# Jenkins Tools
+# Jenkins Tools CLI
 
-交互式 Jenkins CLI 工具，支持分步配置参数、触发构建和查询构建状态。
+交互式 Jenkins CLI 工具，支持分步配置参数、触发构建、查询状态和中止任务。
+
+## 功能
+
+- 🧙 **交互式向导** — 4 步引导完成认证 → 选择任务 → 配置参数 → 提交构建
+- 🔍 **任务搜索** — 从 Jenkins 搜索并选择任务，自动显示最近构建状态
+- 📋 **参数记忆** — 自动合并 Jenkins 默认值、配置文件预设和上次使用的参数
+- ✅ **选择类型参数** — 自动识别 Choice/Radio 类型参数，提供选项列表
+- 📊 **构建状态** — 查看最近构建记录及实时状态
+- 🛑 **中止/删除** — 中止正在运行的任务或删除已完成任务
 
 ## 安装
 
+### 从 npm 安装（推荐）
+
 ```bash
+npm install -g jenkins-tools-cli
+```
+
+### 从源码安装
+
+```bash
+git clone <repo-url>
+cd jenkins-tools
 npm install
 npm run build
 npm link
@@ -17,40 +36,51 @@ npm link
 ```bash
 jkt                    # 启动交互式向导
 jkt run                # 同上
-jkt run --job frontend-deploy  # 跳过任务选择步骤
+jkt run --job pc-dev   # 跳过任务选择，直接配置参数
 ```
 
 向导流程：
-1. **认证** — 首次使用引导配置，已配置则自动验证
-2. **选择任务** — 从预配置列表选择或手动输入
-3. **配置参数** — 自动合并 Jenkins 默认值 + 配置文件预设 + 历史记录
-4. **提交执行** — 确认摘要后触发构建
+1. **认证** — 首次使用引导配置（URL / 用户名 / API Token 或密码），已配置则自动验证
+2. **选择任务** — 从预配置列表选择，或搜索 Jenkins 上的任务
+3. **配置参数** — 自动合并默认值，逐个展示支持修改
+4. **提交执行** — 确认摘要后触发构建，返回构建号和 URL
 
 ### 快捷构建
 
 ```bash
-jkt build frontend-deploy -p ENV=staging -p BRANCH=dev
+jkt build pc-dev                           # 进入参数配置向导后构建
+jkt build pc-dev -p branch=main -p ENV=prod  # 直接传参构建
 ```
 
 ### 查询状态
 
 ```bash
-jkt status frontend-deploy         # 最近构建状态
-jkt status frontend-deploy -n 42   # 指定构建号
-jkt status frontend-deploy --log   # 查看构建日志
+jkt status               # 显示最近由本工具触发的构建记录
+jkt status pc-dev        # 查询指定 Job 的最近构建状态
+jkt status pc-dev -n 42  # 查询指定构建号
+jkt status pc-dev --log  # 查看构建日志
 ```
+
+### 中止/删除任务
+
+```bash
+jkt abort                # 选择要中止或删除的构建
+```
+
+- 正在构建的任务 → 中止
+- 已完成的任务 → 删除记录
 
 ### 配置管理
 
 ```bash
-jkt config init    # 初始化配置文件
+jkt config init    # 交互式初始化配置文件
 jkt config test    # 测试 Jenkins 连接
-jkt config list    # 列出配置信息
+jkt config list    # 列出服务器和任务配置
 ```
 
 ## 配置
 
-复制 `.jenkinsrc.example.yml` 为 `.jenkinsrc.yml` 并修改：
+在项目目录下创建 `.jenkinsrc.yml`（可参考 `.jenkinsrc.example.yml`）：
 
 ```yaml
 servers:
@@ -60,12 +90,21 @@ servers:
       url: https://jenkins.example.com
       username: your-user
       token: your-api-token
+    staging:
+      url: https://staging.example.com
+      username: your-user
+      password: your-password
 
 jobs:
   frontend-deploy:
     server: production
     name: frontend/deploy-main
+  backend-test:
+    server: staging
+    name: backend/run-tests
 ```
+
+支持 **API Token** 和 **用户名密码** 两种认证方式。
 
 ### 参数合并优先级
 
@@ -73,12 +112,18 @@ jobs:
 
 1. Jenkins 参数定义的默认值
 2. `.jenkinsrc.yml` 中预设的参数值
-3. `.jenkins-history.json` 中最近一次的参数值
+3. `.jenkins-history.json` 中最近一次使用的参数值
 
 ## 开发
 
 ```bash
-npm run dev      # 监听模式编译
-npm run build    # 编译
-npm start        # 运行
+npm install       # 安装依赖
+npm run dev       # 监听模式编译
+npm run build     # 编译
+npm start         # 运行
+npm link          # 全局安装（开发用）
 ```
+
+## License
+
+MIT
