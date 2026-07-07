@@ -201,30 +201,65 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
   if (options.log) {
     const s = spinner(`获取构建 #${buildNumber} 日志...`);
     s.start();
-    const log = await service.getBuildLog(jobName, buildNumber);
-    s.stop();
-    console.log(log);
+    try {
+      const log = await service.getBuildLog(jobName, buildNumber);
+      s.stop();
+      console.log(log);
+    } catch {
+      s.stop();
+      printError(`构建 #${buildNumber} 尚未开始执行，暂无日志`);
+    }
     return;
   }
 
   // 查询状态
   const s = spinner(`查询构建 #${buildNumber} 状态...`);
   s.start();
-  const status = await service.getBuildStatus(jobName, buildNumber);
-  s.stop();
+  try {
+    const status = await service.getBuildStatus(jobName, buildNumber);
+    s.stop();
 
-  const statusIcon = status.building
-    ? chalk.yellow('⏳ 构建中')
-    : status.result === 'SUCCESS'
-      ? chalk.green('✔ 成功')
-      : status.result === 'FAILURE'
-        ? chalk.red('✖ 失败')
-        : status.result === 'ABORTED'
-          ? chalk.gray('⊘ 中止')
-          : chalk.blue(`ℹ ${status.result || '未知'}`);
+    // Pending: result=null && building=false
+    if (status.result === null && !status.building) {
+      console.log(`\n构建 #${status.number}  ${chalk.blue('⏳ 待执行')}`);
+      console.log(`URL: ${status.url}`);
+      console.log(`状态: 已分配构建号，等待执行器启动`);
+      console.log();
+      return;
+    }
 
-  console.log(`\n构建 #${status.number}  ${statusIcon}`);
-  console.log(`URL: ${status.url}`);
-  console.log(`耗时: ${Math.round(status.duration / 1000)}s`);
-  console.log();
+    const statusIcon = status.building
+      ? chalk.yellow('⏳ 构建中')
+      : status.result === 'SUCCESS'
+        ? chalk.green('✔ 成功')
+        : status.result === 'FAILURE'
+          ? chalk.red('✖ 失败')
+          : status.result === 'ABORTED'
+            ? chalk.gray('⊘ 中止')
+            : chalk.blue(`ℹ ${status.result || '未知'}`);
+
+    console.log(`\n构建 #${status.number}  ${statusIcon}`);
+    console.log(`URL: ${status.url}`);
+    console.log(`耗时: ${Math.round(status.duration / 1000)}s`);
+    console.log();
+  } catch {
+    // Build API 不可访问，可能还在排队中，查队列
+    s.stop();
+
+    const s2 = spinner('查询队列...');
+    s2.start();
+    const queued = await service.findQueuedItem(jobName);
+    s2.stop();
+
+    if (queued && !queued.cancelled) {
+      console.log(`\n构建 #${buildNumber}  ${chalk.magenta('⏳ 排队中')}`);
+      console.log(`队列ID: ${queued.id}`);
+      if (queued.why) {
+        console.log(`原因: ${queued.why}`);
+      }
+      console.log();
+    } else {
+      printError(`构建 #${buildNumber} 不存在或无法访问`);
+    }
+  }
 }
