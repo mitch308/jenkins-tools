@@ -169,7 +169,12 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
       }
       const descLine = descParts.length > 0 ? `  ${descParts.join(' ')}` : '';
 
-      console.log(`  ${numberLabel}  ${statusIcon}  ${chalk.gray(time)}  ${chalk.gray(`耗时 ${duration}`)}${descLine}`);
+      // 参数信息行
+      const paramLine = b.params && Object.keys(b.params).length > 0
+        ? `\n      ${chalk.gray(Object.entries(b.params).map(([k, v]) => `${k}=${v}`).join(', '))}`
+        : '';
+
+      console.log(`  ${numberLabel}  ${statusIcon}  ${chalk.gray(time)}  ${chalk.gray(`耗时 ${duration}`)}${descLine}${paramLine}`);
     }
     console.log();
     return;
