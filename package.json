@@ -12,7 +12,7 @@
     "!dist/setup-skills.d.ts"
   ],
   "scripts": {
-    "build": "tsc && node -e \"const fs=require('fs'),p=require('path');function c(s,d){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});for(const f of fs.readdirSync(s)){const sp=p.join(s,f),dp=p.join(d,f);fs.statSync(sp).isDirectory()?c(sp,dp):fs.copyFileSync(sp,dp)}}c(p.resolve('src/skills'),p.resolve('dist/skills'))\"",
+    "build": "node -e \"const fs=require('fs'),p=require('path');const d=p.resolve('dist');if(fs.existsSync(d))fs.rmSync(d,{recursive:true})\" && tsc && node -e \"const fs=require('fs'),p=require('path');function c(s,d){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});for(const f of fs.readdirSync(s)){const sp=p.join(s,f),dp=p.join(d,f);fs.statSync(sp).isDirectory()?c(sp,dp):fs.copyFileSync(sp,dp)}}c(p.resolve('src/skills'),p.resolve('dist/skills'))\"",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "postinstall": "node dist/setup-skills.js",
