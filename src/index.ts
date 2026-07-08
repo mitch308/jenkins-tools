@@ -1,15 +1,19 @@
+import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { registerBuildCommand } from './commands/build.js';
 import { registerStatusCommand } from './commands/status.js';
 import { registerAbortCommand } from './commands/abort.js';
 import { registerConfigCommand } from './commands/config.js';
 
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
+
 const program = new Command();
 
 program
   .name('jkt')
   .description('Interactive Jenkins CLI tool')
-  .version('0.2.1')
+  .version(version)
   .option('-j, --job <job>', '预选任务（跳过任务选择步骤）');
 
 // 默认命令：启动向导
