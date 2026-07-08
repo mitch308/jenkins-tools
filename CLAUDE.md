@@ -42,4 +42,6 @@ Interactive Jenkins CLI tool (`jkt`) built with TypeScript ESM (Node16 module re
   - **Cursor**: `.cursor/rules/jkt.mdc` (rule), `.cursor/skills/jkt/SKILL.md` (skill), `.cursor/agents/jkt.md` (subagent)
   - **Codex**: `AGENTS.md` section appended with `<!-- jkt-skills -->` markers (idempotent replacement)
   - **OpenCode**: `.opencode/agents/jkt.md` (agent definition), `opencode.json` `agent` field merged (idempotent by `jkt-` key prefix)
-- **Build script**: `npm run build` compiles TypeScript then copies `src/skills/` to `dist/skills/` (non-TS assets).
+- **Build script**: `npm run build` cleans `dist/` (via `rimraf`), compiles TypeScript, then copies `src/skills/` to `dist/skills/` (via `scripts/copy-skills.js`).
+- **Version management**: Version is read from `package.json` at runtime via `createRequire` — never hardcode in source. To release a new version, use `npm version patch|minor|major` (auto-bumps `package.json` + creates git tag), then `npm publish` and `git push origin main --tags`.
+- **CLI i18n**: All Commander descriptions and help text must be in Chinese. Use `.helpOption('-h, --help', '显示帮助信息')` and `.addHelpCommand('help [command]', '显示子命令帮助')` on each command.
