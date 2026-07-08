@@ -9,6 +9,7 @@ export function registerBuildCommand(program: Command): void {
   program
     .command('build <job>')
     .description('快捷构建（跳过向导，直接触发）')
+    .helpOption('-h, --help', '显示帮助信息')
     .option('-s, --server <profile>', '服务器 Profile 名称')
     .option('-p, --param <params...>', '构建参数，格式: KEY=VALUE')
     .action(async (job: string, options: { server?: string; param?: string[] }) => {

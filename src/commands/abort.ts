@@ -10,6 +10,7 @@ export function registerAbortCommand(program: Command): void {
   program
     .command('abort [job]')
     .description('中止/删除构建任务')
+    .helpOption('-h, --help', '显示帮助信息')
     .option('-n, --number <buildNumber>', '构建号', parseInt)
     .option('-s, --server <profile>', '服务器 Profile 名称')
     .action(async (job: string | undefined, options: { number?: number; server?: string }) => {

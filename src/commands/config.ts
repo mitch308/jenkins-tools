@@ -9,7 +9,10 @@ import fs from 'node:fs';
 import chalk from 'chalk';
 
 export function registerConfigCommand(program: Command): void {
-  const configCmd = program.command('config').description('配置管理');
+  const configCmd = program.command('config')
+    .description('配置管理')
+    .helpOption('-h, --help', '显示帮助信息')
+    .addHelpCommand('help [command]', '显示子命令帮助');
 
   configCmd
     .command('init')

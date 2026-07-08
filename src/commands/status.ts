@@ -23,6 +23,7 @@ export function registerStatusCommand(program: Command): void {
   program
     .command('status [name]')
     .description('查询构建状态（无参数显示最近记录，指定 Job 名查询详情）')
+    .helpOption('-h, --help', '显示帮助信息')
     .option('-n, --number <buildNumber>', '构建号', parseInt)
     .option('-r, --recent <count>', '查看最近 N 次构建记录', parseInt)
     .option('-l, --log', '查看构建日志')

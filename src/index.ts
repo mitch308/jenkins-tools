@@ -19,8 +19,10 @@ const program = new Command();
 
 program
   .name('jkt')
-  .description('Interactive Jenkins CLI tool')
-  .version(version, '-v, --version')
+  .description('交互式 Jenkins CLI 工具')
+  .version(version, '-v, --version', '显示版本号')
+  .helpOption('-h, --help', '显示帮助信息')
+  .addHelpCommand('help [command]', '显示子命令帮助')
   .option('-j, --job <job>', '预选任务（跳过任务选择步骤）');
 
 // 默认命令：启动向导
