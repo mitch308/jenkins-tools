@@ -4,9 +4,16 @@ import { registerBuildCommand } from './commands/build.js';
 import { registerStatusCommand } from './commands/status.js';
 import { registerAbortCommand } from './commands/abort.js';
 import { registerConfigCommand } from './commands/config.js';
+import { checkUpdate, printUpdateNotice } from './utils/update.js';
 
 const require = createRequire(import.meta.url);
 const { version } = require('../package.json');
+
+// 异步检查更新（不阻塞主流程）
+checkUpdate();
+
+// 进程退出时输出更新提示
+process.on('exit', printUpdateNotice);
 
 const program = new Command();
 
