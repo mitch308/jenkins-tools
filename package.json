@@ -15,7 +15,7 @@
     "build": "rimraf dist && tsc && node scripts/copy-skills.js",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "install": "node scripts/postinstall-hint.js",
+    "postinstall": "node scripts/postinstall-hint.js",
     "setup-skills": "node dist/setup-skills.js",
     "prepublishOnly": "npm run build"
   },
