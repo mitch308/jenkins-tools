@@ -174,6 +174,14 @@ function isTTY(): boolean {
   return process.stdin.isTTY === true;
 }
 
+/**
+ * Check if running as npm postinstall hook.
+ * npm sets npm_lifecycle_event=postinstall when running lifecycle scripts.
+ */
+function isPostinstall(): boolean {
+  return process.env.npm_lifecycle_event === 'postinstall';
+}
+
 function findSkillDir(): string | null {
   if (fs.existsSync(SKILL_DIR)) return SKILL_DIR;
   const srcSkillDir = path.resolve(__dirname, '..', 'src', 'skills', SKILL_NAME);
@@ -331,7 +339,12 @@ async function main(): Promise<void> {
   else if (hasAllFlag) {
     platforms = detectInstalledPlatforms();
   }
-  // Interactive selection (TTY only)
+  // Postinstall: show hint only, don't launch interactive wizard
+  else if (isPostinstall()) {
+    showInstallHint();
+    return;
+  }
+  // Interactive selection (TTY only, user ran `jkt setup-skills` directly)
   else if (isTTY()) {
     platforms = await selectPlatforms();
     if (platforms.length === 0) {
@@ -339,7 +352,7 @@ async function main(): Promise<void> {
       return;
     }
   }
-  // Non-interactive (postinstall, etc.): show install hint
+  // Non-interactive: show install hint
   else {
     showInstallHint();
     return;
