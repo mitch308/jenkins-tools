@@ -38,6 +38,132 @@ const PLATFORMS = [
   { id: 'universal', name: 'Universal (~/.agents/)', dir: '.agents' },
 ];
 
+// ── Global install check ────────────────────────────────────────────
+
+interface GlobalInstallInfo {
+  installed: boolean;
+  version: string | null;
+  path: string | null;
+}
+
+/**
+ * Check if jkt is installed globally and get its version.
+ */
+function getGlobalInstallInfo(): GlobalInstallInfo {
+  const result: GlobalInstallInfo = { installed: false, version: null, path: null };
+
+  try {
+    // Find global jkt binary path
+    const whichCmd = process.platform === 'win32' ? 'where jkt' : 'which jkt';
+    const binPath = execSync(whichCmd, { encoding: 'utf-8', timeout: 5000 }).trim().split(/\r?\n/)[0];
+
+    if (!binPath) return result;
+    result.path = binPath;
+
+    // Get version from the global install
+    const verOutput = execSync('jkt --version', { encoding: 'utf-8', timeout: 5000 }).trim();
+    if (verOutput) {
+      result.installed = true;
+      result.version = verOutput;
+    }
+  } catch {
+    // jkt not found globally or command failed
+  }
+
+  return result;
+}
+
+/**
+ * Check if current process is running via npx.
+ */
+function isRunningViaNpx(): boolean {
+  // npx sets npm_lifecycle_event or places the package in a temp cache dir
+  const npmLifecycle = process.env.npm_lifecycle_event;
+  if (npmLifecycle === 'npx') return true;
+
+  // npx stores packages in _npx/ cache directory
+  const execPath = process.argv[1] || '';
+  if (execPath.includes(`${path.sep}_npx${path.sep}`)) return true;
+
+  // Also check for the npm exec cache pattern
+  if (execPath.includes(`${path.sep}npm${path.sep}_npx`)) return true;
+
+  return false;
+}
+
+/**
+ * Get current running version from package.json.
+ */
+function getCurrentVersion(): string {
+  try {
+    const pkgPath = path.join(__dirname, '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    return pkg.version;
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Check global install and version match before proceeding.
+ * Returns true if safe to continue, false if should abort.
+ */
+function checkGlobalInstall(): boolean {
+  const viaNpx = isRunningViaNpx();
+  const globalInfo = getGlobalInstallInfo();
+  const currentVer = getCurrentVersion();
+
+  // Not running via npx — user is using their global install directly, no check needed
+  if (!viaNpx) return true;
+
+  // Running via npx but no global install found — inform user
+  if (!globalInfo.installed) {
+    console.log('');
+    console.log('  ⚠️  检测到通过 npx 运行，但未找到全局安装的 jkt。');
+    console.log('');
+    console.log('  建议先全局安装 jkt，再运行 setup-skills：');
+    console.log('');
+    console.log('    npm install -g jenkins-tools-cli');
+    console.log('    jkt setup-skills');
+    console.log('');
+    console.log('  npx 运行的 skill 文件在临时缓存中，重启后会丢失。');
+    console.log('  全局安装后 skill 文件位置稳定，升级时也会自动更新。');
+    console.log('');
+    return false;
+  }
+
+  // Running via npx and global install exists — check version match
+  if (globalInfo.version && globalInfo.version !== currentVer) {
+    console.log('');
+    console.log('  ⚠️  版本不匹配！');
+    console.log('');
+    console.log(`  npx 运行版本:  ${currentVer}`);
+    console.log(`  全局安装版本:  ${globalInfo.version}`);
+    console.log('');
+    console.log('  你已全局安装了 jkt，但版本与 npx 下载的不同。');
+    console.log('  建议使用全局安装的版本运行 setup-skills：');
+    console.log('');
+    console.log('    jkt setup-skills');
+    console.log('');
+    console.log('  或先更新全局版本：');
+    console.log('');
+    console.log('    npm update -g jenkins-tools-cli');
+    console.log('    jkt setup-skills');
+    console.log('');
+    return false;
+  }
+
+  // Version matches — npx and global are the same, suggest using global directly
+  console.log('');
+  console.log('  ℹ️  检测到通过 npx 运行，已找到全局安装的 jkt (v' + currentVer + ')。');
+  console.log('  建议直接使用全局命令：');
+  console.log('');
+  console.log('    jkt setup-skills');
+  console.log('');
+
+  return true;
+}
+
 // ── Environment detection ──────────────────────────────────────────
 
 function isCI(): boolean {
@@ -182,7 +308,11 @@ async function main(): Promise<void> {
   const hasPlatformFlag = process.argv.includes('--platform');
   const hasAllFlag = process.argv.includes('--all');
   const hasDryRunFlag = process.argv.includes('--dry-run');
-  const hasFlags = hasPlatformFlag || hasAllFlag || hasDryRunFlag;
+
+  // Check if running via npx — warn about global install mismatch
+  if (!checkGlobalInstall()) {
+    return;
+  }
 
   const skillDir = findSkillDir();
   if (!skillDir) {

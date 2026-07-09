@@ -6,7 +6,7 @@ import { registerStatusCommand } from './commands/status.js';
 import { registerAbortCommand } from './commands/abort.js';
 import { registerConfigCommand } from './commands/config.js';
 import { registerParamsCommand } from './commands/params.js';
-import { checkUpdate, printUpdateNotice } from './utils/update.js';
+import { checkUpdate, printUpdateNotice, waitForUpdateCheck } from './utils/update.js';
 
 const require = createRequire(import.meta.url);
 const { version } = require('../package.json');
@@ -83,5 +83,15 @@ program
       process.exit(err.status ?? 1);
     }
   });
+
+// 检测是否为版本/帮助请求（这些命令退出太快，异步升级检查可能来不及完成）
+const isVersionOrHelp = process.argv.some(
+  (arg) => arg === '-v' || arg === '--version' || arg === '-h' || arg === '--help',
+);
+
+if (isVersionOrHelp) {
+  // 等待升级检查完成，确保 exit 事件中能输出提示
+  await waitForUpdateCheck();
+}
 
 program.parse();
