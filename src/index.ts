@@ -62,40 +62,23 @@ program
   .option('-a, --all', '安装到所有已检测的平台')
   .option('--dry-run', '预览安装内容，不实际复制文件')
   .action(async (options: { platform?: string; all?: boolean; dryRun?: boolean }) => {
-    const { spawn } = await import('node:child_process');
     const { fileURLToPath } = await import('node:url');
     const path = await import('node:path');
-    const fs = (await import('node:fs')).default;
+    const { execSync } = await import('node:child_process');
 
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const skillDir = path.join(__dirname, 'skills', 'jenkins-tools-skill');
+    const setupScript = path.join(__dirname, 'setup-skills.js');
 
-    const isWindows = process.platform === 'win32';
+    // Forward options to setup-skills.js
+    const args = ['node', setupScript];
+    if (options.platform) args.push('--platform', options.platform);
+    if (options.all) args.push('--all');
+    if (options.dryRun) args.push('--dry-run');
 
-    if (isWindows) {
-      const installPs = path.join(skillDir, 'install.ps1');
-      if (!fs.existsSync(installPs)) {
-        console.log('jkt: 未找到 skill 安装文件，请重新安装 jenkins-tools-cli。');
-        process.exit(1);
-      }
-      const psArgs = ['-ExecutionPolicy', 'Bypass', '-File', installPs];
-      if (options.platform) { psArgs.push('-Platform', options.platform); }
-      if (options.all) { psArgs.push('-All'); }
-      if (options.dryRun) { psArgs.push('-DryRun'); }
-      const child = spawn('powershell', psArgs, { stdio: 'inherit' });
-      child.on('close', (code: number) => { process.exit(code ?? 0); });
-    } else {
-      const installSh = path.join(skillDir, 'install.sh');
-      if (!fs.existsSync(installSh)) {
-        console.log('jkt: 未找到 skill 安装文件，请重新安装 jenkins-tools-cli。');
-        process.exit(1);
-      }
-      const args = [installSh];
-      if (options.platform) args.push('--platform', options.platform);
-      if (options.all) args.push('--all');
-      if (options.dryRun) args.push('--dry-run');
-      const child = spawn('sh', args, { stdio: 'inherit' });
-      child.on('close', (code: number) => { process.exit(code ?? 0); });
+    try {
+      execSync(args.join(' '), { stdio: 'inherit' });
+    } catch (err: any) {
+      process.exit(err.status ?? 1);
     }
   });
 

@@ -1,5 +1,5 @@
 ---
-name: jenkins-tools-skill
+name: jenkins-tools
 description: >-
   通过 jkt CLI 与 Jenkins CI/CD 服务器交互。触发构建、查询状态、中止任务、管理配置。
   当用户提到 Jenkins 相关操作时激活：构建、部署、流水线、任务状态、中止、CI/CD、Jenkins。

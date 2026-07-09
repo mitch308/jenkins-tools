@@ -27,7 +27,7 @@ jkt -v  # 验证安装
 ### 自动检测平台（推荐）
 
 ```bash
-cd jenkins-tools-skill
+cd jenkins-tools
 ./install.sh          # macOS/Linux
 .\install.ps1         # Windows PowerShell
 ```
@@ -116,7 +116,7 @@ Jenkins 流水线状态是什么？
 ## 文件结构
 
 ```
-jenkins-tools-skill/
+jenkins-tools/
 ├── SKILL.md          # Skill 定义（Agent Skills Open Standard）
 ├── AGENTS.md         # 伴侣文件（供读取 AGENTS.md 的工具使用）
 ├── install.sh        # 跨平台安装器（macOS/Linux）
