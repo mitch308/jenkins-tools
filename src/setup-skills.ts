@@ -2,7 +2,7 @@
 
 /**
  * Interactive skill installer for jenkins-tools-cli.
- * Triggered by npm postinstall or `jkt setup-skills` command.
+ * Triggered by `jkt setup-skills` command.
  * Installs agent/IDE skill files to the user's global skill directories.
  */
 
@@ -174,16 +174,6 @@ function isTTY(): boolean {
   return process.stdin.isTTY === true;
 }
 
-/**
- * Check if running as npm install lifecycle hook.
- * npm sets npm_lifecycle_event=install when running lifecycle scripts.
- * Note: npm v7+ skips postinstall on global install, but install hook still runs.
- */
-function isNpmInstallHook(): boolean {
-  const event = process.env.npm_lifecycle_event;
-  return event === 'install' || event === 'postinstall';
-}
-
 function findSkillDir(): string | null {
   if (fs.existsSync(SKILL_DIR)) return SKILL_DIR;
   const srcSkillDir = path.resolve(__dirname, '..', 'src', 'skills', SKILL_NAME);
@@ -270,42 +260,6 @@ async function selectPlatforms(): Promise<string[]> {
   }
 }
 
-// ── Install hint ────────────────────────────────────────────────────
-
-function showInstallHint(): void {
-  const detected = detectInstalledPlatforms().filter((id) => id !== 'universal');
-  const platformNames = detected
-    .map((id) => PLATFORMS.find((p) => p.id === id)?.name)
-    .filter(Boolean);
-
-  console.log('');
-  console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('  🛠️  jkt: Jenkins CLI Skill 安装提示');
-  console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('');
-  console.log('  jkt 可以为你的 AI 编程工具安装 Skill，');
-  console.log('  让 AI 助手直接帮你触发构建、查询状态等操作。');
-  console.log('');
-
-  if (platformNames.length > 0) {
-    console.log(`  检测到已安装的工具: ${platformNames.join('、')}`);
-    console.log('');
-  }
-
-  console.log('  运行以下命令安装 Skill:');
-  console.log('');
-  console.log('    jkt setup-skills          # 交互式选择平台');
-  console.log('    jkt setup-skills --all    # 安装到所有已检测平台');
-  console.log('    jkt setup-skills --platform claude-code  # 指定平台');
-  console.log('');
-  console.log('  支持的平台: Claude Code、Cursor、Copilot、Windsurf、');
-  console.log('  Cline、Codex CLI、Gemini、Kiro、Goose、OpenCode、');
-  console.log('  Roo Code、Kilo Code、Trae、Factory Droid、Junie、Antigravity');
-  console.log('');
-  console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('');
-}
-
 // ── Entry point ───────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -341,12 +295,7 @@ async function main(): Promise<void> {
   else if (hasAllFlag) {
     platforms = detectInstalledPlatforms();
   }
-  // npm install hook: show hint only, don't launch interactive wizard
-  else if (isNpmInstallHook()) {
-    showInstallHint();
-    return;
-  }
-  // Interactive selection (TTY only, user ran `jkt setup-skills` directly)
+  // Interactive selection (TTY only)
   else if (isTTY()) {
     platforms = await selectPlatforms();
     if (platforms.length === 0) {
@@ -354,9 +303,10 @@ async function main(): Promise<void> {
       return;
     }
   }
-  // Non-interactive: show install hint
+  // Non-interactive: cannot proceed
   else {
-    showInstallHint();
+    console.log('jkt: 非交互终端，无法启动安装向导。');
+    console.log('jkt: 运行 "jkt setup-skills" 或 "jkt setup-skills --all" 安装 skills。');
     return;
   }
 
