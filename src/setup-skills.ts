@@ -134,6 +134,42 @@ async function selectPlatforms(): Promise<string[]> {
   }
 }
 
+// ── Install hint ────────────────────────────────────────────────────
+
+function showInstallHint(): void {
+  const detected = detectInstalledPlatforms().filter((id) => id !== 'universal');
+  const platformNames = detected
+    .map((id) => PLATFORMS.find((p) => p.id === id)?.name)
+    .filter(Boolean);
+
+  console.log('');
+  console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('  🛠️  jkt: Jenkins CLI Skill 安装提示');
+  console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
+  console.log('  jkt 可以为你的 AI 编程工具安装 Skill，');
+  console.log('  让 AI 助手直接帮你触发构建、查询状态等操作。');
+  console.log('');
+
+  if (platformNames.length > 0) {
+    console.log(`  检测到已安装的工具: ${platformNames.join('、')}`);
+    console.log('');
+  }
+
+  console.log('  运行以下命令安装 Skill:');
+  console.log('');
+  console.log('    jkt setup-skills          # 交互式选择平台');
+  console.log('    jkt setup-skills --all    # 安装到所有已检测平台');
+  console.log('    jkt setup-skills --platform claude-code  # 指定平台');
+  console.log('');
+  console.log('  支持的平台: Claude Code、Cursor、Copilot、Windsurf、');
+  console.log('  Cline、Codex CLI、Gemini、Kiro、Goose、OpenCode、');
+  console.log('  Roo Code、Kilo Code、Trae、Factory Droid、Junie、Antigravity');
+  console.log('');
+  console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('');
+}
+
 // ── Entry point ───────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -173,10 +209,9 @@ async function main(): Promise<void> {
       return;
     }
   }
-  // Non-interactive (postinstall, etc.): skip with hint
+  // Non-interactive (postinstall, etc.): show install hint
   else {
-    console.log('jkt: 非交互终端，跳过 skill 安装。');
-    console.log('jkt: 运行 "jkt setup-skills" 手动安装 skills。');
+    showInstallHint();
     return;
   }
 
