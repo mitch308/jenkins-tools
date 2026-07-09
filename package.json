@@ -7,12 +7,15 @@
     "jkt": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/setup-skills.js.map"
   ],
   "scripts": {
-    "build": "rimraf dist && tsc",
+    "build": "rimraf dist && tsc && node scripts/copy-skills.js",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
+    "postinstall": "node dist/setup-skills.js || echo \"jkt: skill setup skipped\"",
+    "setup-skills": "node dist/setup-skills.js",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

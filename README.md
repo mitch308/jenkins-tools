@@ -10,6 +10,7 @@
 - ✅ **选择类型参数** — 自动识别 Choice/Radio 类型参数，提供选项列表
 - 📊 **构建状态** — 查看最近构建记录及实时状态，支持查看指定 Job 的最近 N 次构建历史（含排队中/待执行任务及参数信息）
 - 🛑 **中止/删除** — 中止正在运行的任务、取消排队中的构建或删除已完成任务
+- 🤖 **Agent Skills** — 安装时自动部署跨平台 Agent skill，支持 Claude Code、Cursor、Copilot 等 17 个平台
 
 ## 安装
 
@@ -147,6 +148,46 @@ npm run dev       # 监听模式编译
 npm run build     # 编译
 npm start         # 运行
 npm link          # 全局安装（开发用）
+```
+
+## Agent/IDE Skills
+
+`jkt` 安装后自动部署 Agent skill，让 AI 编程助手可以直接操作 Jenkins。
+
+### 自动安装
+
+`npm install -g jenkins-tools-cli` 时自动检测已安装的 AI 工具并安装 skill。
+
+### 手动安装
+
+```bash
+jkt setup-skills                    # 自动检测平台并安装
+jkt setup-skills --platform cursor  # 指定平台
+jkt setup-skills --all              # 安装到所有已检测的平台
+jkt setup-skills --dry-run          # 预览安装内容
+```
+
+### 支持平台
+
+| 平台 | 路径 | 格式 |
+|------|------|------|
+| Claude Code | `~/.claude/skills/` | SKILL.md（原生） |
+| Cursor | `~/.cursor/rules/` | .mdc（自动生成） |
+| GitHub Copilot | `~/.copilot/skills/` | SKILL.md（原生） |
+| Codex CLI | `~/.agents/skills/` | SKILL.md（原生） |
+| Gemini CLI | `~/.gemini/skills/` | SKILL.md（原生） |
+| Windsurf | `~/.codeium/windsurf/skills/` | .md 规则 |
+| OpenCode | `~/.config/opencode/skills/` | SKILL.md（原生） |
+| + 更多... | | |
+
+### 使用方式
+
+安装后在 AI 工具中输入：
+
+```
+/jenkins-tools 触发前端部署
+/jenkins-tools 查看构建状态
+/jenkins-tools 中止卡住的构建
 ```
 
 ## License

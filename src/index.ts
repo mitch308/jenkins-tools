@@ -53,4 +53,50 @@ registerStatusCommand(program);
 registerAbortCommand(program);
 registerConfigCommand(program);
 
+// setup-skills 子命令：手动安装 Agent/IDE skills
+program
+  .command('setup-skills')
+  .description('安装 Agent/IDE Skills（Claude Code、Cursor、Codex 等）')
+  .helpOption('-h, --help', '显示帮助信息')
+  .option('-p, --platform <platform>', '指定安装平台')
+  .option('-a, --all', '安装到所有已检测的平台')
+  .option('--dry-run', '预览安装内容，不实际复制文件')
+  .action(async (options: { platform?: string; all?: boolean; dryRun?: boolean }) => {
+    const { spawn } = await import('node:child_process');
+    const { fileURLToPath } = await import('node:url');
+    const path = await import('node:path');
+    const fs = (await import('node:fs')).default;
+
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const skillDir = path.join(__dirname, 'skills', 'jenkins-tools-skill');
+
+    const isWindows = process.platform === 'win32';
+
+    if (isWindows) {
+      const installPs = path.join(skillDir, 'install.ps1');
+      if (!fs.existsSync(installPs)) {
+        console.log('jkt: 未找到 skill 安装文件，请重新安装 jenkins-tools-cli。');
+        process.exit(1);
+      }
+      const psArgs = ['-ExecutionPolicy', 'Bypass', '-File', installPs];
+      if (options.platform) { psArgs.push('-Platform', options.platform); }
+      if (options.all) { psArgs.push('-All'); }
+      if (options.dryRun) { psArgs.push('-DryRun'); }
+      const child = spawn('powershell', psArgs, { stdio: 'inherit' });
+      child.on('close', (code: number) => { process.exit(code ?? 0); });
+    } else {
+      const installSh = path.join(skillDir, 'install.sh');
+      if (!fs.existsSync(installSh)) {
+        console.log('jkt: 未找到 skill 安装文件，请重新安装 jenkins-tools-cli。');
+        process.exit(1);
+      }
+      const args = [installSh];
+      if (options.platform) args.push('--platform', options.platform);
+      if (options.all) args.push('--all');
+      if (options.dryRun) args.push('--dry-run');
+      const child = spawn('sh', args, { stdio: 'inherit' });
+      child.on('close', (code: number) => { process.exit(code ?? 0); });
+    }
+  });
+
 program.parse();

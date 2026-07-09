@@ -37,6 +37,17 @@ Interactive Jenkins CLI tool (`jkt`) built with TypeScript ESM (Node16 module re
 - **Jenkins URLs**: Never expose URLs with embedded credentials (`user:pass@host`) in user-facing output. Use `stripAuthFromUrl()` to clean them.
 - **XML parameter parsing** (`parseParamsFromXml`): Parses parameters in XML document order (not by type) to preserve the order shown in Jenkins. The regex matches all parameter tag types in a single pass.
 - **Build record tracking**: Every build triggered via `jkt` or `jkt build` is recorded in `buildRecords[]` in the history file. This feeds the `jkt status` and `jkt abort` commands.
-- **Build script**: `npm run build` cleans `dist/` (via `rimraf`), compiles TypeScript.
+- **Build script**: `npm run build` cleans `dist/` (via `rimraf`), compiles TypeScript, then copies skill files via `scripts/copy-skills.js`.
 - **Version management**: Version is read from `package.json` at runtime via `createRequire` — never hardcode in source. To release a new version, use `npm version patch|minor|major` (auto-bumps `package.json` + creates git tag), then `npm publish` and `git push origin main --tags`.
 - **CLI i18n**: All Commander descriptions and help text must be in Chinese. Use `.helpOption('-h, --help', '显示帮助信息')` and `.addHelpCommand('help [command]', '显示子命令帮助')` on each command.
+
+**Agent/IDE Skills System** (`src/skills/jenkins-tools-skill/`):
+- Follows the **Agent Skills Open Standard** — single `SKILL.md` + `AGENTS.md` + cross-platform installer
+- Supports 17 platforms: Claude Code, Cursor, Copilot, Codex, Gemini, Windsurf, Cline, OpenCode, Kiro, Goose, Roo Code, Kilo Code, Trae, Junie, Factory Droid, Antigravity, Universal
+- **Installation**: `npm install` triggers `postinstall` → `dist/setup-skills.js` auto-detects platform and installs skill to the user's global skill directory. CI environments are skipped automatically.
+- **Manual install**: `jkt setup-skills` command with `--platform`, `--all`, `--dry-run` options
+- **Build pipeline**: `scripts/copy-skills.js` copies `src/skills/` to `dist/skills/` (TypeScript compiler only processes .ts files, not .md/.sh/.ps1)
+- **Dual installer**: `install.sh` (macOS/Linux, POSIX-compatible) + `install.ps1` (Windows PowerShell) — both auto-detect platform, support `--platform`/`--all`/`--dry-run`
+- **Format adapters**: Cursor `.mdc` auto-generated from SKILL.md; Cline/Roo Code/Kilo Code/Trae get plain .md rules
+- **Universal symlink**: After primary install, creates `~/.agents/skills/jenkins-tools-skill` link for tools reading the universal path
+- **Skill content**: All in Chinese. SKILL.md contains trigger, core operations (build/status/abort/config), workflow examples, decision flow, error handling. References in `references/` directory.
