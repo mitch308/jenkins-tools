@@ -175,11 +175,13 @@ function isTTY(): boolean {
 }
 
 /**
- * Check if running as npm postinstall hook.
- * npm sets npm_lifecycle_event=postinstall when running lifecycle scripts.
+ * Check if running as npm install lifecycle hook.
+ * npm sets npm_lifecycle_event=install when running lifecycle scripts.
+ * Note: npm v7+ skips postinstall on global install, but install hook still runs.
  */
-function isPostinstall(): boolean {
-  return process.env.npm_lifecycle_event === 'postinstall';
+function isNpmInstallHook(): boolean {
+  const event = process.env.npm_lifecycle_event;
+  return event === 'install' || event === 'postinstall';
 }
 
 function findSkillDir(): string | null {
@@ -339,8 +341,8 @@ async function main(): Promise<void> {
   else if (hasAllFlag) {
     platforms = detectInstalledPlatforms();
   }
-  // Postinstall: show hint only, don't launch interactive wizard
-  else if (isPostinstall()) {
+  // npm install hook: show hint only, don't launch interactive wizard
+  else if (isNpmInstallHook()) {
     showInstallHint();
     return;
   }

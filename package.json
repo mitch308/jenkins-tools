@@ -14,7 +14,7 @@
     "build": "rimraf dist && tsc && node scripts/copy-skills.js",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "postinstall": "node dist/setup-skills.js || echo \"jkt: skill setup skipped\"",
+    "install": "node dist/setup-skills.js || echo \"jkt: skill setup skipped\"",
     "setup-skills": "node dist/setup-skills.js",
     "prepublishOnly": "npm run build"
   },
