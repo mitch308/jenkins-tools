@@ -7,16 +7,12 @@
     "jkt": "./dist/index.js"
   },
   "files": [
-    "dist",
-    "!dist/setup-skills.js.map",
-    "!dist/setup-skills.d.ts"
+    "dist"
   ],
   "scripts": {
-    "build": "rimraf dist && tsc && node scripts/copy-skills.js",
+    "build": "rimraf dist && tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "postinstall": "node dist/setup-skills.js",
-    "setup-skills": "node dist/setup-skills.js",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

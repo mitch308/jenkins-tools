@@ -149,25 +149,6 @@ npm start         # 运行
 npm link          # 全局安装（开发用）
 ```
 
-## Agent/IDE Skills
-
-安装时自动提示安装 Agent/IDE Skills，支持：
-
-- **Claude Code** → `.claude/commands/jkt-*.md`（slash 命令）、`.claude/skills/jkt/`（技能）、`.claude/agents/jkt.md`（子代理）
-- **Cursor** → `.cursor/rules/jkt.mdc`（规则）、`.cursor/skills/jkt/`（技能）、`.cursor/agents/jkt.md`（子代理）
-- **Codex** → `AGENTS.md` 追加章节（幂等替换）
-- **OpenCode** → `.opencode/agents/jkt.md`（代理定义）、`opencode.json` agent 字段合并（幂等）
-
-也可手动运行：
-
-```bash
-jkt setup-skills       # 重新选择平台并安装
-```
-
-安装后，Agent 可以通过自然语言触发 Jenkins 操作，如"帮我构建 pc-dev"。
-
-> ⚠️ **注意**：Agent/IDE Skills 功能尚未经过完整测试验证，各平台兼容性可能存在问题，欢迎反馈。
-
 ## License
 
 MIT
