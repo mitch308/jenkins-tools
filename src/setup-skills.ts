@@ -165,19 +165,23 @@ async function main(): Promise<void> {
   else if (hasAllFlag) {
     platforms = detectInstalledPlatforms();
   }
-  // Interactive selection (TTY or has flags for manual invocation)
-  else if (isTTY() || hasFlags) {
+  // Interactive selection (TTY only)
+  else if (isTTY()) {
     platforms = await selectPlatforms();
     if (platforms.length === 0) {
       console.log('\njkt: 未选择任何平台，跳过安装。');
       return;
     }
   }
-  // Non-interactive without flags: skip with hint
+  // Non-interactive (postinstall, etc.): auto-install to detected platforms
   else {
-    console.log('jkt: 非交互终端，跳过 skill 安装。');
-    console.log('jkt: 运行 "jkt setup-skills" 手动安装 skills。');
-    return;
+    platforms = detectInstalledPlatforms();
+    if (platforms.length === 0) {
+      console.log('jkt: 未检测到 AI 编程平台，跳过 skill 安装。');
+      console.log('jkt: 运行 "jkt setup-skills" 手动安装 skills。');
+      return;
+    }
+    console.log(`\n🛠️  jkt: 自动安装 skill 到检测到的 ${platforms.length} 个平台...\n`);
   }
 
   // Install for each selected platform

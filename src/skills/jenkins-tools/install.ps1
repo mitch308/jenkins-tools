@@ -7,6 +7,10 @@ param(
     [string]$Platform
 )
 
+# 设置输出编码为 UTF-8，避免中文乱码
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $SkillName = "jenkins-tools"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $userHome = $env:USERPROFILE
@@ -98,7 +102,7 @@ alwaysApply: true
 ---
 $($bodyLines -join "`n")
 "@
-    Set-Content -Path $mdcFile -Value $mdcContent -Encoding UTF8
+    Set-Content -Path $mdcFile -Value $mdcContent -Encoding UTF8 -NoNewline
     Write-Ok "已生成 Cursor .mdc: $mdcFile"
 }
 
