@@ -181,7 +181,9 @@ jkt abort <任务名> -n 42 # 中止/删除指定构建号
 jkt config init          # 交互式初始化配置（首次使用）
 jkt config add <名称>    # 添加新的服务器 Profile
 jkt config use <名称>    # 切换默认服务器 Profile
-jkt config test          # 测试 Jenkins 连接
+jkt config remove <名称> # 移除服务器 Profile
+jkt config test          # 测试默认服务器的连接
+jkt config test <名称>   # 测试指定服务器的连接
 jkt config list          # 显示所有服务器和任务配置
 ```
 

@@ -110,7 +110,9 @@ jkt abort <任务> -n 42          # 指定构建号
 jkt config init                # 首次设置
 jkt config add <profile>       # 添加服务器 Profile
 jkt config use <profile>       # 切换默认服务器
-jkt config test                # 测试连接
+jkt config remove <profile>    # 移除服务器 Profile
+jkt config test                # 测试默认服务器连接
+jkt config test <profile>      # 测试指定服务器连接
 jkt config list                # 显示所有配置
 ```
 

@@ -76,27 +76,34 @@ export function registerConfigCommand(program: Command): void {
     });
 
   configCmd
-    .command('test')
+    .command('test [name]')
     .description('测试 Jenkins 连接')
-    .action(async () => {
+    .action(async (name?: string) => {
       const config = loadConfig();
       if (!config) {
         printError('未找到配置文件，请先运行 jkt config init');
         process.exit(1);
       }
 
-      const profile = config.servers.profiles[config.servers.default];
+      const profileName = name || config.servers.default;
+      const profile = config.servers.profiles[profileName];
+      if (!profile) {
+        printError(`Profile "${profileName}" 不存在`);
+        printInfo(`可用的 Profile: ${Object.keys(config.servers.profiles).join(', ')}`);
+        process.exit(1);
+      }
+
       const service = new JenkinsService(profile);
 
-      const s = spinner(`测试连接 ${profile.url}...`);
+      const s = spinner(`测试连接 ${profileName} (${profile.url})...`);
       s.start();
       const ok = await service.testConnection();
       s.stop();
 
       if (ok) {
-        printSuccess('连接成功！');
+        printSuccess(`${profileName} 连接成功！`);
       } else {
-        printError('连接失败');
+        printError(`${profileName} 连接失败`);
         process.exit(1);
       }
     });
@@ -169,6 +176,52 @@ export function registerConfigCommand(program: Command): void {
       config.servers.default = name;
       saveConfig(config);
       printSuccess(`默认 Profile 已切换为 "${name}" (${profile.url})`);
+    });
+
+  configCmd
+    .command('remove <name>')
+    .description('移除服务器 Profile')
+    .helpOption('-h, --help', '显示帮助信息')
+    .action((name: string) => {
+      const config = loadConfig();
+      if (!config) {
+        printError('未找到配置文件，请先运行 jkt config init');
+        process.exit(1);
+      }
+
+      const profile = config.servers.profiles[name];
+      if (!profile) {
+        printError(`Profile "${name}" 不存在`);
+        printInfo(`可用的 Profile: ${Object.keys(config.servers.profiles).join(', ')}`);
+        process.exit(1);
+      }
+
+      // 检查是否是默认 Profile
+      if (config.servers.default === name) {
+        printWarning(`Profile "${name}" 是当前默认 Profile，移除后需要切换默认 Profile`);
+        const remaining = Object.keys(config.servers.profiles).filter(k => k !== name);
+        if (remaining.length === 0) {
+          printError('这是唯一的 Profile，无法移除。请先添加其他 Profile。');
+          process.exit(1);
+        }
+        // 自动切换到第一个剩余 Profile
+        config.servers.default = remaining[0];
+        printInfo(`默认 Profile 已自动切换为 "${remaining[0]}"`);
+      }
+
+      // 检查是否有任务引用此 Profile
+      const referencedJobs = config.jobs
+        ? Object.entries(config.jobs)
+            .filter(([, job]) => job.server === name)
+            .map(([alias]) => alias)
+        : [];
+      if (referencedJobs.length > 0) {
+        printWarning(`以下任务引用了 Profile "${name}": ${referencedJobs.join(', ')}`);
+      }
+
+      delete config.servers.profiles[name];
+      saveConfig(config);
+      printSuccess(`Profile "${name}" 已移除`);
     });
 
   configCmd
