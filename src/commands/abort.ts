@@ -39,7 +39,7 @@ export function registerAbortCommand(program: Command): void {
         // 如果指定了 job 和构建号，直接操作
         if (jobName && options.number) {
           await abortOrDelete(service, jobName, options.number);
-          return;
+          process.exit(0);
         }
 
         // 如果指定了 job 但没有构建号，查询该 job 最近构建
@@ -50,10 +50,10 @@ export function registerAbortCommand(program: Command): void {
           s.stop();
           if (!buildNumber) {
             printInfo(`${jobName} 没有构建记录`);
-            return;
+            process.exit(0);
           }
           await abortOrDelete(service, jobName, buildNumber);
-          return;
+          process.exit(0);
         }
 
         // 如果只指定了构建号，用上次构建的 job
@@ -64,7 +64,7 @@ export function registerAbortCommand(program: Command): void {
             process.exit(1);
           }
           await abortOrDelete(service, lastJob, options.number);
-          return;
+          process.exit(0);
         }
 
         // 展示最近构建记录供选择
@@ -155,13 +155,14 @@ export function registerAbortCommand(program: Command): void {
             process.exit(1);
           }
           await abortOrDelete(service, jobName, buildNumber);
-          return;
+          process.exit(0);
         }
 
         const target = statuses[selected];
         if (target.buildNumber) {
           await abortOrDelete(service, target.jobName, target.buildNumber, target.queueUrl);
         }
+        process.exit(0);
       } catch (err: any) {
         printError(err.message);
         process.exit(1);
