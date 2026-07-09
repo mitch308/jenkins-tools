@@ -65,18 +65,66 @@ jkt -v
 
 ### 1. 触发构建
 
-**交互式向导**（推荐首次使用或复杂任务）：
+**⚠️ 重要：agent 运行在非 TTY 环境，jkt 的交互式向导无法使用。必须使用以下流程：**
+
+#### 步骤 1：查询参数定义
 
 ```bash
-jkt                    # 完整向导：认证 → 选择任务 → 配置参数 → 执行
-jkt --job <任务名>      # 跳过任务选择，直接配置参数
+jkt params <任务名> --json    # 获取参数定义（JSON 格式，供 agent 解析）
+jkt params <任务名>           # 人类可读格式
 ```
 
-**直接传参构建**：
+参数定义包含：
+- `name` — 参数名
+- `type` — 类型（String/Choice/Boolean/MultiSelect/Password）
+- `default` — 默认值
+- `choices` — 可选值列表（Choice/MultiSelect 类型）
+- `description` — 参数说明
+
+#### 步骤 2：向用户确认参数
+
+根据参数定义，**主动向用户询问**需要修改的参数：
+- 如果有 `choices`，向用户列出选项让其选择
+- 如果有 `default`，展示默认值让用户确认或修改
+- 如果是 `Password` 类型，提示用户输入
+- 如果参数不多且用户已明确指定值，可直接使用用户提供的值
+
+#### 步骤 3：使用 -p 传参构建
 
 ```bash
-jkt build <任务名>                            # 进入参数配置向导
-jkt build <任务名> -p branch=main -p ENV=prod  # 直接传参构建
+jkt build <任务名> -p key1=value1 -p key2=value2
+```
+
+**不要**运行不带 `-p` 的 `jkt build`（会进入交互式向导，在非 TTY 环境下卡住）。
+
+#### 示例：agent 驱动的构建流程
+
+```
+用户: 部署前端到生产环境
+
+agent 执行:
+1. jkt params frontend-deploy --json
+   → 获取参数: [{name:"branch",type:"String",default:"main"},
+                {name:"ENV",type:"Choice",choices:["dev","staging","prod"],default:"dev"}]
+
+2. 向用户确认:
+   "任务 frontend-deploy 有以下参数：
+    - branch（默认: main）
+    - ENV（可选: dev, staging, prod，默认: dev）
+    你要修改哪些参数？"
+
+3. 用户回答: "ENV 改成 prod，branch 用默认值"
+
+4. jkt build frontend-deploy -p ENV=prod
+   → 报告构建号和 URL
+```
+
+#### 快速构建（用户已提供所有参数）
+
+如果用户明确指定了所有参数值：
+
+```bash
+jkt build <任务名> -p branch=main -p ENV=prod
 ```
 
 **任务名格式**：
@@ -166,10 +214,15 @@ jobs:
 用户: 部署前端到生产环境
 
 响应:
-1. 检查 'frontend-deploy' 任务是否在配置中
-2. 执行: jkt build frontend-deploy -p ENV=prod -p branch=main
-3. 报告构建号和 URL
-4. 可选: 用 jkt status frontend-deploy 监控状态
+1. 执行: jkt params frontend-deploy --json
+2. 解析参数定义，向用户确认:
+   "任务 frontend-deploy 参数:
+    - branch (默认: main)
+    - ENV (可选: dev/staging/prod，默认: dev)
+    确认参数？"
+3. 用户: "ENV 改成 prod"
+4. 执行: jkt build frontend-deploy -p ENV=prod
+5. 报告构建号和 URL
 ```
 
 ### 示例 2：检查构建是否成功
@@ -207,6 +260,16 @@ jobs:
 4. 确认 Profile 已添加
 ```
 
+### 示例 5：用户明确指定参数的快速构建
+
+```
+用户: 用 main 分支构建 pc-dev，环境用 staging
+
+响应:
+1. 直接执行: jkt build pc-dev -p branch=main -p ENV=staging
+2. 报告构建号和 URL
+```
+
 ## 决策流程
 
 当用户提及 Jenkins 操作时：
@@ -225,11 +288,24 @@ Jenkins 是否已配置？ --> 否 --> 执行 jkt config init
     v
 什么操作？
     |
-    +-- "构建"/"部署"/"触发" --> jkt build <任务> [-p 参数]
+    +-- "构建"/"部署"/"触发"
+    |       |
+    |       v
+    |   用户是否提供了所有参数值？
+    |       |
+    |       +-- 是 --> jkt build <任务> -p key=value
+    |       |
+    |       +-- 否 --> jkt params <任务> --json
+    |                   → 解析参数定义
+    |                   → 向用户确认/选择参数
+    |                   → jkt build <任务> -p key=value
+    |
     +-- "状态"/"查看"/"进度" --> jkt status [任务]
     +-- "中止"/"停止"/"取消" --> jkt abort [任务]
     +-- "配置"/"设置"/"服务器" --> jkt config <子命令>
 ```
+
+**⚠️ 绝对不要**在 agent 环境中运行不带 `-p` 的 `jkt build`，会因非 TTY 导致卡住。
 
 ## 参数合并优先级
 

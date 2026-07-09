@@ -5,6 +5,7 @@ import { registerBuildCommand } from './commands/build.js';
 import { registerStatusCommand } from './commands/status.js';
 import { registerAbortCommand } from './commands/abort.js';
 import { registerConfigCommand } from './commands/config.js';
+import { registerParamsCommand } from './commands/params.js';
 import { checkUpdate, printUpdateNotice } from './utils/update.js';
 
 const require = createRequire(import.meta.url);
@@ -52,6 +53,7 @@ registerBuildCommand(program);
 registerStatusCommand(program);
 registerAbortCommand(program);
 registerConfigCommand(program);
+registerParamsCommand(program);
 
 // setup-skills 子命令：手动安装 Agent/IDE skills
 program

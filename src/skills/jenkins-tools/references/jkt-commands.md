@@ -30,10 +30,54 @@ jkt --job pc-dev       # 跳过任务选择
 直接触发构建：
 
 ```bash
-jkt build <任务>                            # 参数向导
-jkt build <任务> -p branch=main             # 直接传参
+jkt build <任务> -p branch=main             # 直接传参（推荐，agent 环境）
 jkt build <任务> -p branch=main -p ENV=prod # 多个参数
+jkt build <任务>                            # 进入参数向导（仅 TTY 环境）
 ```
+
+**⚠️ agent 环境（非 TTY）下不要运行不带 `-p` 的 jkt build，会卡住。**
+应先用 `jkt params <任务> --json` 查询参数定义，确认参数后用 `-p` 传参。
+
+### jkt params
+
+查询任务的参数定义（**agent 构建流程的核心命令**）：
+
+```bash
+jkt params <任务>              # 人类可读格式
+jkt params <任务> --json       # JSON 格式（供 agent/程序解析）
+jkt params <任务> -s staging   # 指定服务器 Profile
+```
+
+**JSON 输出示例**：
+
+```json
+{
+  "name": "frontend-deploy",
+  "buildable": true,
+  "params": [
+    {
+      "name": "branch",
+      "type": "String",
+      "default": "main",
+      "description": "Git 分支",
+      "choices": null
+    },
+    {
+      "name": "ENV",
+      "type": "Choice",
+      "default": "dev",
+      "description": "部署环境",
+      "choices": ["dev", "staging", "prod"]
+    }
+  ]
+}
+```
+
+**agent 应按以下流程使用**：
+1. 执行 `jkt params <任务> --json` 获取参数定义
+2. 解析参数类型、默认值、可选值
+3. 向用户确认需要修改的参数
+4. 用 `jkt build <任务> -p key=value` 传参构建
 
 ### jkt status
 
