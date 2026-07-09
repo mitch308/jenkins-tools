@@ -587,11 +587,13 @@ export class JenkinsService {
       // Job API not available, return only queued items
     }
 
-    // 3. Merge: queued items first, then builds (dedup by buildNumber)
+    // 3. Merge: queued items first (newest first), then builds (dedup by buildNumber)
     // If a queued item already has a buildNumber, don't show it again from builds
     const queuedNumbers = new Set(queuedItems.filter(q => q.number > 0).map(q => q.number));
     const dedupedBuilds = builds.filter(b => !queuedNumbers.has(b.number));
-    const merged = [...queuedItems, ...dedupedBuilds].slice(0, limit);
+    // Sort queued items by build number descending so newest queued builds appear first
+    const sortedQueued = [...queuedItems].sort((a, b) => b.number - a.number);
+    const merged = [...sortedQueued, ...dedupedBuilds].slice(0, limit);
     return merged;
   }
 
