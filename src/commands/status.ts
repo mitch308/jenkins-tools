@@ -239,6 +239,9 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
       console.log(`\n构建 #${status.number}  ${chalk.blue('⏳ 待执行')}`);
       console.log(`URL: ${status.url}`);
       console.log(`状态: 已分配构建号，等待执行器启动`);
+      if (status.params && Object.keys(status.params).length > 0) {
+        console.log(`参数: ${chalk.gray(Object.entries(status.params).map(([k, v]) => `${k}=${v}`).join(', '))}`);
+      }
       console.log();
       return;
     }
@@ -256,6 +259,12 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
     console.log(`\n构建 #${status.number}  ${statusIcon}`);
     console.log(`URL: ${status.url}`);
     console.log(`耗时: ${formatDuration(status.duration)}`);
+    if (status.userName) {
+      console.log(`用户: ${chalk.cyan(`@${status.userName}`)}`);
+    }
+    if (status.params && Object.keys(status.params).length > 0) {
+      console.log(`参数: ${chalk.gray(Object.entries(status.params).map(([k, v]) => `${k}=${v}`).join(', '))}`);
+    }
     console.log();
   } catch {
     // Build API 不可访问，可能还在排队中，查队列
@@ -271,6 +280,12 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
       console.log(`队列ID: ${queued.id}`);
       if (queued.why) {
         console.log(`原因: ${queued.why}`);
+      }
+      if (queued.userName) {
+        console.log(`用户: ${chalk.cyan(`@${queued.userName}`)}`);
+      }
+      if (queued.params && Object.keys(queued.params).length > 0) {
+        console.log(`参数: ${chalk.gray(Object.entries(queued.params).map(([k, v]) => `${k}=${v}`).join(', '))}`);
       }
       console.log();
     } else {

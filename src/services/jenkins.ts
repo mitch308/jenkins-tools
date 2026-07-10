@@ -21,6 +21,8 @@ export interface BuildStatus {
   url: string;
   timestamp: number;
   duration: number;
+  params?: Record<string, string>;
+  userName?: string;
 }
 
 export interface BuildSummary {
@@ -48,6 +50,8 @@ export interface QueueItemInfo {
   why?: string;
   stuck: boolean;
   cancelled: boolean;
+  params?: Record<string, string>;
+  userName?: string;
 }
 
 export class JenkinsService {
@@ -337,7 +341,7 @@ export class JenkinsService {
   async findQueuedItem(jobName: string, buildNumber?: number): Promise<QueueItemInfo | null> {
     try {
       const [queueData, jobData] = await Promise.all([
-        this.getJson<any>('/queue/api/json'),
+        this.getJson<any>('/queue/api/json?tree=items[id,task[name],executable[number],inQueueSince,why,cancelled,actions[causes[userId,userName],parameters[name,value]]]'),
         this.getJson<any>(`/job/${encodeURIComponent(jobName)}/api/json?tree=nextBuildNumber`),
       ]);
 
@@ -376,6 +380,22 @@ export class JenkinsService {
         if (buildNumber !== undefined && itemBuildNumber !== buildNumber) {
           continue;
         }
+        // Extract trigger user and build parameters from actions
+        let userName: string | undefined;
+        const params: Record<string, string> = {};
+        for (const action of item.actions || []) {
+          for (const cause of action.causes || []) {
+            if (cause.userName) {
+              userName = cause.userName;
+              break;
+            }
+          }
+          for (const param of action.parameters || []) {
+            if (param.name && param.value !== undefined) {
+              params[param.name] = String(param.value);
+            }
+          }
+        }
         return {
           id: item.id,
           buildNumber: itemBuildNumber,
@@ -383,6 +403,8 @@ export class JenkinsService {
           why: item.why,
           stuck: item.stuck ?? false,
           cancelled: item.cancelled ?? false,
+          params: Object.keys(params).length > 0 ? params : undefined,
+          userName,
         };
       }
       return null;
@@ -392,7 +414,23 @@ export class JenkinsService {
   }
 
   async getBuildStatus(jobName: string, buildNumber: number): Promise<BuildStatus> {
-    const data = await this.getJson<any>(`/job/${encodeURIComponent(jobName)}/${buildNumber}/api/json`);
+    const data = await this.getJson<any>(`/job/${encodeURIComponent(jobName)}/${buildNumber}/api/json?tree=number,result,building,url,timestamp,duration,actions[causes[userId,userName],parameters[name,value]]`);
+    // Extract trigger user and build parameters from actions
+    let userName: string | undefined;
+    const params: Record<string, string> = {};
+    for (const action of data.actions || []) {
+      for (const cause of action.causes || []) {
+        if (cause.userName) {
+          userName = cause.userName;
+          break;
+        }
+      }
+      for (const param of action.parameters || []) {
+        if (param.name && param.value !== undefined) {
+          params[param.name] = String(param.value);
+        }
+      }
+    }
     return {
       number: data.number,
       result: data.result,
@@ -400,6 +438,8 @@ export class JenkinsService {
       url: data.url,
       timestamp: data.timestamp,
       duration: data.duration,
+      params: Object.keys(params).length > 0 ? params : undefined,
+      userName,
     };
   }
 
