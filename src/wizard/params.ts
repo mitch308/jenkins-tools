@@ -1,6 +1,6 @@
 import type { JenkinsService } from '../services/jenkins.js';
 import type { AppConfig, JobParamDef } from '../config/schema.js';
-import { loadHistory, saveHistory } from '../config/store.js';
+import { loadHistory, saveHistory, loadParamDefs, saveParamDefs } from '../config/store.js';
 import { spinner, printInfo, printWarning } from '../utils/output.js';
 import { input, confirm, select } from '../utils/prompt.js';
 
@@ -10,38 +10,51 @@ export async function runParamsWizard(
   config: AppConfig,
   jobAlias?: string,
 ): Promise<Record<string, string>> {
-  // 1. 从 Jenkins 获取参数定义
-  const s = spinner('查询任务参数定义...');
-  s.start();
+  // 1. 获取参数定义：优先从本地缓存，无缓存时从远程获取
   let jobInfo;
-  try {
-    jobInfo = await service.getJobInfo(jobName);
-  } catch (err: any) {
-    s.stop();
-    printWarning(`无法获取任务参数: ${err.message}`);
-    // 如果获取失败，尝试直接构建无参数任务
-    const proceed = await confirm('是否跳过参数配置直接构建？');
-    if (proceed) {
-      return {};
-    }
-    throw err;
-  }
-  s.stop();
+  let paramDefs: JobParamDef[];
 
-  if (jobInfo.params.length === 0) {
+  const cachedDefs = loadParamDefs(jobName);
+  if (cachedDefs && cachedDefs.length > 0) {
+    // 使用本地缓存
+    paramDefs = cachedDefs;
+    printInfo('使用本地缓存的参数定义');
+  } else {
+    // 本地无缓存，从远程获取
+    const s = spinner('查询任务参数定义...');
+    s.start();
+    try {
+      jobInfo = await service.getJobInfo(jobName);
+      paramDefs = jobInfo.params;
+    } catch (err: any) {
+      s.stop();
+      printWarning(`无法获取任务参数: ${err.message}`);
+      // 如果获取失败，尝试直接构建无参数任务
+      const proceed = await confirm('是否跳过参数配置直接构建？');
+      if (proceed) {
+        return {};
+      }
+      throw err;
+    }
+    s.stop();
+    // 保存到本地缓存
+    saveParamDefs(jobName, {}, paramDefs);
+  }
+
+  if (paramDefs.length === 0) {
     printInfo('该任务没有参数定义，将直接构建');
     return {};
   }
 
   // 2. 合并参数值
-  const mergedDefaults = mergeParams(jobInfo.params, config, jobName, jobAlias);
+  const mergedDefaults = mergeParams(paramDefs, config, jobName, jobAlias);
 
   // 3. 逐个展示参数，允许修改
   console.log('\n配置构建参数（回车保留当前值，输入新值修改）：\n');
 
   const finalParams: Record<string, string> = {};
 
-  for (const param of jobInfo.params) {
+  for (const param of paramDefs) {
     const currentValue = mergedDefaults[param.name] ?? param.default ?? '';
     const hint = param.description ? ` - ${param.description}` : '';
 
@@ -63,8 +76,9 @@ export async function runParamsWizard(
     }
   }
 
-  // 4. 保存到历史
+  // 4. 保存到历史（同时更新 paramDefs 缓存）
   saveHistory(jobName, finalParams);
+  saveParamDefs(jobName, finalParams, paramDefs);
 
   return finalParams;
 }

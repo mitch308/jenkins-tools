@@ -24,6 +24,7 @@ export interface AppConfig {
 export interface HistoryEntry {
   lastParams: Record<string, string>;
   lastRun: string;
+  paramDefs?: JobParamDef[];
 }
 
 export type HistoryData = Record<string, HistoryEntry>;

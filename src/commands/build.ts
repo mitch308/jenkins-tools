@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { loadConfig } from '../config/loader.js';
 import { JenkinsService } from '../services/jenkins.js';
-import { addBuildRecord } from '../config/store.js';
+import { addBuildRecord, loadParamDefs, saveParamDefs } from '../config/store.js';
 import { runParamsWizard } from '../wizard/params.js';
 import { printSuccess, printError, spinner, stripAuthFromUrl } from '../utils/output.js';
 
@@ -39,6 +39,7 @@ export function registerBuildCommand(program: Command): void {
 
         // 解析参数
         let params: Record<string, string> = {};
+        let usedWizard = false;
         if (options.param && options.param.length > 0) {
           // 通过 -p 传入的参数
           for (const p of options.param) {
@@ -54,6 +55,7 @@ export function registerBuildCommand(program: Command): void {
         } else {
           // 未传 -p 参数，进入参数配置向导
           params = await runParamsWizard(service, jobName, config, jobAlias);
+          usedWizard = true;
         }
 
         const s = spinner(`正在构建 ${jobName}...`);
@@ -82,6 +84,24 @@ export function registerBuildCommand(program: Command): void {
           server: profileName,
           queueUrl: stripAuthFromUrl(result.queueUrl),
         });
+
+        // 更新本地参数缓存
+        if (!usedWizard) {
+          // -p 传参模式：向导已自行缓存，这里只处理 -p 模式
+          const cachedDefs = loadParamDefs(jobName);
+          if (cachedDefs) {
+            // 有缓存定义，更新 lastParams
+            saveParamDefs(jobName, params, cachedDefs);
+          } else {
+            // 无缓存定义，从远程获取并缓存
+            try {
+              const jobInfo = await service.getJobInfo(jobName);
+              saveParamDefs(jobName, params, jobInfo.params);
+            } catch {
+              // 远程获取失败不影响构建结果，静默跳过
+            }
+          }
+        }
       } catch (err: any) {
         printError(err.message);
         process.exit(1);

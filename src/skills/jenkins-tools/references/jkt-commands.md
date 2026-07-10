@@ -40,20 +40,30 @@ jkt build <任务>                            # 进入参数向导（仅 TTY 环
 
 ### jkt params
 
-查询任务的参数定义（**agent 构建流程的核心命令**）：
+查询任务的参数定义（**默认读取本地缓存，agent 构建流程的核心命令**）：
 
 ```bash
-jkt params <任务>              # 人类可读格式
-jkt params <任务> --json       # JSON 格式（供 agent/程序解析）
+jkt params <任务>              # 人类可读格式（默认读本地缓存）
+jkt params <任务> --json       # JSON 格式（供 agent/程序解析，默认读本地缓存）
 jkt params <任务> -s staging   # 指定服务器 Profile
+jkt params <任务> --remote     # 从远程 Jenkins 获取最新参数定义（同时更新本地缓存）
+jkt params <任务> --remote --json  # 远程获取 + JSON 格式
+jkt params <任务> --sync       # 从远程同步参数（删除已移除的 key，新增 key 使用默认值）
 ```
 
-**JSON 输出示例**：
+**⚠️ 默认读取本地缓存**：`jkt params` 默认从本地缓存读取参数定义，速度快且可离线使用。首次使用（无缓存）时自动从远程获取。
+
+**JSON 输出示例（本地缓存模式）**：
 
 ```json
 {
   "name": "frontend-deploy",
   "buildable": true,
+  "source": "local",
+  "lastParams": {
+    "branch": "main",
+    "ENV": "prod"
+  },
   "params": [
     {
       "name": "branch",
@@ -73,11 +83,18 @@ jkt params <任务> -s staging   # 指定服务器 Profile
 }
 ```
 
+**JSON 输出字段说明**：
+- `source` — 数据来源：`"local"`（本地缓存）或 `"remote"`（远程获取）
+- `lastParams` — 上次使用的参数值（可直接用于构建，无需逐个确认默认值）
+- `sync` — 同步信息（仅 `--sync` 模式）：`added`（新增的 key）、`removed`（删除的 key）
+
 **agent 应按以下流程使用**：
-1. 执行 `jkt params <任务> --json` 获取参数定义
-2. 解析参数类型、默认值、可选值
-3. 向用户确认需要修改的参数
-4. 用 `jkt build <任务> -p key=value` 传参构建
+1. 执行 `jkt params <任务> --json` 获取参数定义（默认读本地缓存，快速）
+2. 如果有 `lastParams`，直接展示上次使用的参数值，询问用户是否修改
+3. 如果用户确认不修改，直接用 `lastParams` 的值构建
+4. 如果需要最新参数定义：`jkt params <任务> --remote --json`
+5. 如果远程参数配置已变更：`jkt params <任务> --sync` 同步后重新查看
+6. 用 `jkt build <任务> -p key=value` 传参构建
 
 ### jkt status
 

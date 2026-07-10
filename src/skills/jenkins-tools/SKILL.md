@@ -70,9 +70,13 @@ jkt -v
 #### 步骤 1：查询参数定义
 
 ```bash
-jkt params <任务名> --json    # 获取参数定义（JSON 格式，供 agent 解析）
-jkt params <任务名>           # 人类可读格式
+jkt params <任务名> --json    # 获取参数定义（默认读本地缓存，JSON 格式，供 agent 解析）
+jkt params <任务名>           # 人类可读格式（默认读本地缓存）
+jkt params <任务名> --remote --json  # 从远程 Jenkins 获取最新参数定义
+jkt params <任务名> --sync    # 从远程同步参数（删除已移除的 key，新增 key 使用默认值）
 ```
+
+**⚠️ 默认读取本地缓存**：`jkt params` 默认从本地缓存读取参数定义，速度快且可离线使用。首次使用（无缓存）时自动从远程获取。
 
 参数定义包含：
 - `name` — 参数名
@@ -81,9 +85,16 @@ jkt params <任务名>           # 人类可读格式
 - `choices` — 可选值列表（Choice/MultiSelect 类型）
 - `description` — 参数说明
 
+**JSON 输出额外字段**：
+- `source` — 数据来源：`"local"`（本地缓存）或 `"remote"`（远程获取）
+- `lastParams` — 上次使用的参数值（可直接用于构建，无需逐个确认默认值）
+- `sync` — 同步信息（仅 `--sync` 模式）：`added`（新增的 key）、`removed`（删除的 key）
+
 #### 步骤 2：向用户确认参数
 
 根据参数定义，**主动向用户询问**需要修改的参数：
+- **优先使用 `lastParams`**：如果 JSON 输出中有 `lastParams`，直接展示上次使用的参数值，询问用户是否修改
+- 如果用户确认不修改，直接用 `lastParams` 的值构建，无需逐个确认
 - 如果有 `choices`，向用户列出选项让其选择
 - 如果有 `default`，展示默认值让用户确认或修改
 - 如果是 `Password` 类型，提示用户输入
@@ -104,19 +115,58 @@ jkt build <任务名> -p key1=value1 -p key2=value2
 
 agent 执行:
 1. jkt params frontend-deploy --json
-   → 获取参数: [{name:"branch",type:"String",default:"main"},
-                {name:"ENV",type:"Choice",choices:["dev","staging","prod"],default:"dev"}]
+   → 获取参数（本地缓存，快速）:
+     {source:"local", lastParams:{branch:"main",ENV:"dev"},
+      params:[{name:"branch",type:"String",default:"main"},
+              {name:"ENV",type:"Choice",choices:["dev","staging","prod"],default:"dev"}]}
 
-2. 向用户确认:
-   "任务 frontend-deploy 有以下参数：
-    - branch（默认: main）
-    - ENV（可选: dev, staging, prod，默认: dev）
+2. 向用户确认（使用 lastParams 作为起点）:
+   "任务 frontend-deploy 上次使用的参数：
+    - branch: main
+    - ENV: dev
     你要修改哪些参数？"
 
 3. 用户回答: "ENV 改成 prod，branch 用默认值"
 
-4. jkt build frontend-deploy -p ENV=prod
+4. jkt build frontend-deploy -p branch=main -p ENV=prod
    → 报告构建号和 URL
+```
+
+#### 示例：用户确认不修改参数
+
+```
+用户: 部署前端到生产环境
+
+agent 执行:
+1. jkt params frontend-deploy --json
+   → {source:"local", lastParams:{branch:"main",ENV:"prod"}, ...}
+
+2. 向用户确认:
+   "上次使用的参数：branch=main, ENV=prod，是否直接使用？"
+
+3. 用户: "是"
+
+4. jkt build frontend-deploy -p branch=main -p ENV=prod
+   → 报告构建号和 URL
+```
+
+#### 示例：远程参数变更后同步
+
+```
+用户: 部署前端到生产环境
+
+agent 执行:
+1. jkt params frontend-deploy --json
+   → {source:"local", lastParams:{branch:"main",ENV:"prod"}, ...}
+
+2. 用户: "Jenkins 上新增了一个参数"
+
+3. jkt params frontend-deploy --sync
+   → 同步结果：新增参数 REGION (默认值: cn)，删除参数 DEPRECATED_PARAM
+   → 本地缓存已更新
+
+4. jkt params frontend-deploy --json
+   → 获取更新后的参数定义，向用户确认
 ```
 
 #### 快速构建（用户已提供所有参数）
@@ -297,10 +347,18 @@ Jenkins 是否已配置？ --> 否 --> 执行 jkt config init
     |       |
     |       +-- 是 --> jkt build <任务> -p key=value
     |       |
-    |       +-- 否 --> jkt params <任务> --json
-    |                   → 解析参数定义
-    |                   → 向用户确认/选择参数
-    |                   → jkt build <任务> -p key=value
+    |       +-- 否 --> jkt params <任务> --json（默认读本地缓存）
+    |                   |
+    |                   +-- 有 lastParams？ --> 展示上次参数，询问是否修改
+    |                   |       |
+    |                   |       +-- 不修改 --> jkt build <任务> -p key=value（使用 lastParams）
+    |                   |       +-- 修改 --> 确认新值后构建
+    |                   |
+    |                   +-- 无 lastParams --> 解析参数定义，向用户确认/选择参数
+    |                                       → jkt build <任务> -p key=value
+    |                   |
+    |                   +-- 需要最新参数？ --> jkt params <任务> --remote --json
+    |                   +-- 远程参数变更？ --> jkt params <任务> --sync
     |
     +-- "状态"/"查看"/"进度" --> jkt status [任务]
     +-- "中止"/"停止"/"取消" --> jkt abort [任务]
@@ -334,6 +392,8 @@ Jenkins 是否已配置？ --> 否 --> 执行 jkt config init
 - **任务别名**：在配置中为常用任务定义短名称
 - **参数预设**：在配置中存储常用的参数组合
 - **历史记忆**：jkt 自动记住每个任务上次使用的参数
+- **本地缓存**：`jkt params` 默认读取本地缓存，快速且可离线使用；首次使用自动从远程获取
+- **远程同步**：当 Jenkins 参数配置变更后，使用 `jkt params <任务> --sync` 同步本地缓存
 - **多服务器**：使用 Profile 在不同 Jenkins 实例间切换
 
 ## 参考文档

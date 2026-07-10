@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { HistoryData, HistoryEntry, HistoryMeta, BuildRecord } from './schema.js';
+import type { HistoryData, HistoryEntry, HistoryMeta, BuildRecord, JobParamDef } from './schema.js';
 import { getHistoryPath } from './paths.js';
 
 const MAX_BUILD_RECORDS = 50;
@@ -65,4 +65,19 @@ export function addBuildRecord(record: BuildRecord): void {
 
 export function getBuildRecords(limit = 20): BuildRecord[] {
   return (loadHistoryFile().buildRecords || []).slice(0, limit);
+}
+
+export function loadParamDefs(jobName: string): JobParamDef[] | null {
+  const file = loadHistoryFile();
+  return file.jobs[jobName]?.paramDefs ?? null;
+}
+
+export function saveParamDefs(jobName: string, params: Record<string, string>, paramDefs: JobParamDef[]): void {
+  const file = loadHistoryFile();
+  if (!file.jobs[jobName]) {
+    file.jobs[jobName] = { lastParams: params, lastRun: new Date().toISOString() };
+  }
+  file.jobs[jobName].paramDefs = paramDefs;
+  file.meta = { lastJob: jobName };
+  saveHistoryFile(file);
 }
