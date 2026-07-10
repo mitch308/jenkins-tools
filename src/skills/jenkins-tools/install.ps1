@@ -1,36 +1,31 @@
-# install.ps1 — jenkins-tools skill 安装脚本（Windows PowerShell）
-# 由 setup-skills.ts 调用，安装到指定平台
-# 退出码: 0=成功, 1=验证失败, 2=平台无效, 3=权限不足
+# install.ps1 — jenkins-tools skill installer (Windows PowerShell)
+# Called by setup-skills.ts to install to specified platform
+# Exit codes: 0=success, 1=validation failed, 2=invalid platform, 3=permission denied
 
 param(
     [Parameter(Mandatory=$true)]
     [string]$Platform
 )
 
-# 设置输出编码为 UTF-8，避免中文乱码
-chcp 65001 > $null
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-
 $SkillName = "jenkins-tools"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $userHome = $env:USERPROFILE
 
-# ── 日志 ────────────────────────────────────────────────────────────
+# ── Logging ─────────────────────────────────────────────────────────
 
-function Write-Info($msg) { Write-Host "[信息]  $msg" -ForegroundColor Blue }
-function Write-Ok($msg)   { Write-Host "[成功]  $msg" -ForegroundColor Green }
-function Write-Err($msg)  { Write-Host "[错误]  $msg" -ForegroundColor Red }
+function Write-Info($msg) { Write-Host "[INFO]   $msg" -ForegroundColor Blue }
+function Write-Ok($msg)   { Write-Host "[OK]     $msg" -ForegroundColor Green }
+function Write-Err($msg)  { Write-Host "[ERROR]  $msg" -ForegroundColor Red }
 
-# ── SKILL.md 验证 ───────────────────────────────────────────────────
+# ── SKILL.md validation ─────────────────────────────────────────────
 
 $skillMd = Join-Path $ScriptDir "SKILL.md"
-if (-not (Test-Path $skillMd)) { Write-Err "未找到 SKILL.md"; exit 1 }
+if (-not (Test-Path $skillMd)) { Write-Err "SKILL.md not found"; exit 1 }
 $firstLine = Get-Content $skillMd -TotalCount 1
-if ($firstLine -ne "---") { Write-Err "SKILL.md 格式错误"; exit 1 }
-Write-Ok "SKILL.md 验证通过"
+if ($firstLine -ne "---") { Write-Err "Invalid SKILL.md format"; exit 1 }
+Write-Ok "SKILL.md validated"
 
-# ── 安装路径解析 ────────────────────────────────────────────────────
+# ── Install path resolution ─────────────────────────────────────────
 
 $base = ""
 switch ($Platform) {
@@ -51,13 +46,13 @@ switch ($Platform) {
     "junie"         { $base = "$userHome\.junie\skills" }
     "antigravity"   { $base = "$userHome\.gemini\antigravity\skills" }
     "universal"     { $base = "$userHome\.agents\skills" }
-    default { Write-Err "未知平台: $Platform"; exit 2 }
+    default { Write-Err "Unknown platform: $Platform"; exit 2 }
 }
 
 $installDir = Join-Path $base $SkillName
-Write-Info "安装目录: $installDir"
+Write-Info "Install dir: $installDir"
 
-# ── 文件安装 ────────────────────────────────────────────────────────
+# ── File installation ───────────────────────────────────────────────
 
 if (Test-Path $installDir) { Remove-Item $installDir -Recurse -Force -Confirm:$false }
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
@@ -69,14 +64,14 @@ foreach ($f in $files) {
     Copy-Item $f.FullName -Destination $installDir -Recurse -Force
     $count++
 }
-Write-Ok "已复制 $count 个文件到 $installDir"
+Write-Ok "Copied $count files to $installDir"
 
-# ── Cursor .mdc 格式适配 ────────────────────────────────────────────
+# ── Cursor .mdc format adapter ──────────────────────────────────────
 
 if ($Platform -eq "cursor") {
     $skillMdPath = Join-Path $ScriptDir "SKILL.md"
     $mdcFile = Join-Path $installDir "$SkillName.mdc"
-    # 提取 description 和 body
+    # Extract description and body
     $lines = Get-Content $skillMdPath
     $desc = ""
     $bodyLines = @()
@@ -104,18 +99,18 @@ alwaysApply: true
 $($bodyLines -join "`n")
 "@
     Set-Content -Path $mdcFile -Value $mdcContent -Encoding UTF8 -NoNewline
-    Write-Ok "已生成 Cursor .mdc: $mdcFile"
+    Write-Ok "Generated Cursor .mdc: $mdcFile"
 }
 
-# ── 通用路径链接 ────────────────────────────────────────────────────
+# ── Universal path link ─────────────────────────────────────────────
 
 if ($Platform -notin @("codex", "universal")) {
     $universalDir = Join-Path "$userHome\.agents\skills" $SkillName
     New-Item -ItemType Directory -Path "$userHome\.agents\skills" -Force | Out-Null
     if (Test-Path $universalDir) { Remove-Item $universalDir -Recurse -Force -Confirm:$false }
     New-Item -ItemType Junction -Path $universalDir -Target $installDir -Force | Out-Null
-    Write-Ok "通用链接: $universalDir -> $installDir"
+    Write-Ok "Universal link: $universalDir -> $installDir"
 }
 
-Write-Ok "Skill '$SkillName' 已安装到 $Platform"
+Write-Ok "Skill '$SkillName' installed to $Platform"
 exit 0
