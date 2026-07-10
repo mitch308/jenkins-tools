@@ -8,6 +8,7 @@ param(
 )
 
 # 设置输出编码为 UTF-8，避免中文乱码
+chcp 65001 > $null
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
