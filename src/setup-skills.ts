@@ -348,7 +348,11 @@ async function selectPlatforms(): Promise<string[]> {
       },
     ]);
     return selected as string[];
-  } catch {
+  } catch (err: any) {
+    // User pressed Ctrl+C to cancel — don't fall through to auto-install
+    if (err?.name === 'ExitPromptError' || err?.message?.includes('User force closed')) {
+      return [];
+    }
     // inquirer not available, fallback to detected platforms
     console.log('jkt: 无法启动交互式选择，将安装到所有已检测平台。');
     return installed;

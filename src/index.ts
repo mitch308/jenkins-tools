@@ -157,21 +157,29 @@ program
       const label = p ? p.name : platformId;
       console.log(`── 卸载 ${label} ──`);
 
+      const subDir = PLATFORM_SUBDIRS[platformId] || 'skills';
+      const skillDir = path.join(home, p?.dir || '', subDir, skillName);
+
       if (options.dryRun) {
-        const subDir = PLATFORM_SUBDIRS[platformId] || 'skills';
-        const skillDir = path.join(home, p?.dir || '', subDir, skillName);
         console.log(`  [预览] 将删除 ${skillDir}`);
         continue;
       }
 
       // Remove skill directory
-      const subDir = PLATFORM_SUBDIRS[platformId] || 'skills';
-      const skillDir = path.join(home, p?.dir || '', subDir, skillName);
       if (fs.existsSync(skillDir)) {
+        // List files before deleting
+        try {
+          const files = fs.readdirSync(skillDir);
+          for (const f of files) {
+            console.log(`  - 删除 ${path.join(skillDir, f)}`);
+          }
+        } catch {
+          // Ignore listing errors
+        }
         fs.rmSync(skillDir, { recursive: true, force: true });
-        console.log('  ✔ 已删除 skill 目录');
+        console.log(`  ✔ 已删除 ${skillDir}`);
       } else {
-        console.log('  ℹ 未找到 skill 目录，跳过');
+        console.log(`  ℹ 未找到 ${skillDir}，跳过`);
       }
 
       // Remove universal link
@@ -179,7 +187,7 @@ program
       if (fs.existsSync(universalDir)) {
         try {
           fs.rmSync(universalDir, { recursive: true, force: true });
-          console.log('  ✔ 已删除通用链接');
+          console.log(`  ✔ 已删除通用链接 ${universalDir}`);
         } catch {
           // Ignore
         }
