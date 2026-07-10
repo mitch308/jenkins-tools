@@ -1,5 +1,3 @@
 node_modules/
 dist/
-.jenkinsrc.yml
-.jenkins-history.json
 *.js.map
