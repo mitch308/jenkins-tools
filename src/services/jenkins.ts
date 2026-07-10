@@ -728,7 +728,9 @@ export class JenkinsService {
       .replace(/&gt;/g, '>');
 
     // Match Groovy list literal: return ['val1', 'val2', ...]
-    const listMatch = script.match(/return\s*\[([\s\S]*?)\]/);
+    // Match to the end of the return statement (last ] on the line),
+    // since choice values may contain [ ] characters themselves.
+    const listMatch = script.match(/return\s*\[([\s\S]*?)\]\s*$/);
     if (!listMatch) return [];
 
     const listContent = listMatch[1];
