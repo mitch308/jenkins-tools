@@ -3,17 +3,26 @@ import { loadConfig } from '../config/loader.js';
 import { JenkinsService } from '../services/jenkins.js';
 import { addBuildRecord, loadParamDefs, saveParamDefs } from '../config/store.js';
 import { runParamsWizard } from '../wizard/params.js';
+import { runAuthWizard } from '../wizard/auth.js';
+import { runJobSelectWizard } from '../wizard/job-select.js';
+import { runExecuteWizard } from '../wizard/execute.js';
 import { printSuccess, printError, spinner, stripAuthFromUrl } from '../utils/output.js';
 
 export function registerBuildCommand(program: Command): void {
   program
-    .command('build <job>')
-    .description('快捷构建（跳过向导，直接触发）')
+    .command('build [job]')
+    .description('快捷构建（不传 job 时进入完整向导）')
     .helpOption('-h, --help', '显示帮助信息')
     .option('-s, --server <profile>', '服务器 Profile 名称')
     .option('-p, --param <params...>', '构建参数，格式: KEY=VALUE')
-    .action(async (job: string, options: { server?: string; param?: string[] }) => {
+    .action(async (job: string | undefined, options: { server?: string; param?: string[] }) => {
       try {
+        // 未传 job：运行完整向导（等同 jkt）
+        if (!job) {
+          await runFullWizard();
+          return;
+        }
+
         const config = loadConfig();
         if (!config) {
           printError('未找到配置文件，请先运行 jkt config init');
@@ -107,4 +116,17 @@ export function registerBuildCommand(program: Command): void {
         process.exit(1);
       }
     });
+}
+
+/**
+ * 完整向导流程：auth → job-select → params → execute
+ */
+async function runFullWizard(): Promise<void> {
+  const { config, service } = await runAuthWizard();
+  const selection = await runJobSelectWizard(config, service);
+  const params = await runParamsWizard(service, selection.jobName, config, selection.jobAlias);
+  const result = await runExecuteWizard(service, selection.jobName, params, selection.serverProfile);
+  if (!result) {
+    printError('构建已取消');
+  }
 }
