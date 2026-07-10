@@ -201,31 +201,126 @@ function detectInstalledPlatforms(): string[] {
 
 // ── Installation ───────────────────────────────────────────────────
 
-function installForPlatform(skillDir: string, platform: string): void {
-  const isWindows = process.platform === 'win32';
+/**
+ * Platform-specific skill subdirectory mapping.
+ * Most platforms use `skills/`, some use `rules/`.
+ */
+const PLATFORM_SUBDIRS: Record<string, string> = {
+  'cursor': 'rules',
+  'trae': 'rules',
+};
 
-  if (isWindows) {
-    const installPs = path.join(skillDir, 'install.ps1');
-    if (!fs.existsSync(installPs)) {
-      console.log(`jkt: install.ps1 未找到，跳过 ${platform} 安装。`);
-      return;
+function installForPlatform(skillDir: string, platform: string): void {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const p = PLATFORMS.find((pl) => pl.id === platform);
+  if (!p) {
+    console.log(`jkt: 未知平台 ${platform}，跳过。`);
+    return;
+  }
+
+  // 1. Validate SKILL.md
+  const skillMdPath = path.join(skillDir, 'SKILL.md');
+  if (!fs.existsSync(skillMdPath)) {
+    console.log('jkt: 未找到 SKILL.md，跳过安装。');
+    return;
+  }
+  const firstLine = fs.readFileSync(skillMdPath, 'utf-8').split('\n')[0];
+  if (firstLine?.trim() !== '---') {
+    console.log('jkt: SKILL.md 格式无效，跳过安装。');
+    return;
+  }
+  console.log('  ✔ SKILL.md 验证通过');
+
+  // 2. Resolve install path
+  const subDir = PLATFORM_SUBDIRS[platform] || 'skills';
+  const installDir = path.join(home, p.dir, subDir, SKILL_NAME);
+  console.log(`  ℹ 安装目录: ${installDir}`);
+
+  // 3. Copy files
+  if (fs.existsSync(installDir)) {
+    fs.rmSync(installDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(installDir, { recursive: true });
+
+  const entries = fs.readdirSync(skillDir);
+  let count = 0;
+  for (const entry of entries) {
+    if (entry === 'install.ps1' || entry === 'install.sh') continue;
+    const src = path.join(skillDir, entry);
+    const dest = path.join(installDir, entry);
+    fs.cpSync(src, dest, { recursive: true, force: true });
+    count++;
+  }
+  console.log(`  ✔ 已复制 ${count} 个文件`);
+
+  // 4. Cursor .mdc format adapter
+  if (platform === 'cursor') {
+    generateMdcFile(skillMdPath, installDir);
+  }
+
+  // 5. Universal path link
+  if (platform !== 'codex' && platform !== 'universal') {
+    createUniversalLink(installDir, home);
+  }
+
+  console.log(`  ✔ Skill '${SKILL_NAME}' 已安装到 ${p.name}\n`);
+}
+
+/**
+ * Generate Cursor .mdc file from SKILL.md.
+ */
+function generateMdcFile(skillMdPath: string, installDir: string): void {
+  const content = fs.readFileSync(skillMdPath, 'utf-8');
+  const lines = content.split('\n');
+
+  let desc = '';
+  const bodyLines: string[] = [];
+  let fmCount = 0;
+
+  for (const line of lines) {
+    if (line.trim() === '---') {
+      fmCount++;
+      continue;
     }
-    try {
-      execSync(`powershell -ExecutionPolicy Bypass -File "${installPs}" -Platform ${platform}`, { stdio: 'inherit' });
-    } catch (err: any) {
-      console.log(`jkt: ${platform} 安装失败: ${err.message}`);
+    if (fmCount === 1 && line.match(/^description:\s*/)) {
+      desc = line.replace(/^description:\s*/, '').trim();
+      // Remove YAML multiline indicator
+      if (desc.startsWith('>-')) desc = desc.slice(2).trim();
+      continue;
     }
-  } else {
-    const installSh = path.join(skillDir, 'install.sh');
-    if (!fs.existsSync(installSh)) {
-      console.log(`jkt: install.sh 未找到，跳过 ${platform} 安装。`);
-      return;
+    if (fmCount >= 2) {
+      bodyLines.push(line);
     }
-    try {
-      execSync(`sh "${installSh}" --platform ${platform}`, { stdio: 'inherit' });
-    } catch (err: any) {
-      console.log(`jkt: ${platform} 安装失败: ${err.message}`);
+  }
+
+  const mdcContent = `---\ndescription: ${desc}\nglobs:\nalwaysApply: true\n---\n${bodyLines.join('\n')}`;
+  const mdcPath = path.join(installDir, `${SKILL_NAME}.mdc`);
+  fs.writeFileSync(mdcPath, mdcContent, 'utf-8');
+  console.log(`  ✔ 已生成 Cursor .mdc`);
+}
+
+/**
+ * Create universal symlink/junction at ~/.agents/skills/<skillName>.
+ */
+function createUniversalLink(installDir: string, home: string): void {
+  const universalDir = path.join(home, '.agents', 'skills', SKILL_NAME);
+  const agentsDir = path.join(home, '.agents', 'skills');
+
+  try {
+    fs.mkdirSync(agentsDir, { recursive: true });
+    if (fs.existsSync(universalDir)) {
+      fs.rmSync(universalDir, { recursive: true, force: true });
     }
+    if (process.platform === 'win32') {
+      // Windows: use junction (directory symlink that doesn't require admin)
+      fs.symlinkSync(installDir, universalDir, 'junction');
+    } else {
+      fs.symlinkSync(installDir, universalDir);
+    }
+    console.log('  ✔ 通用链接已创建');
+  } catch (err: any) {
+    // Non-critical — don't fail the whole install
+    console.log(`  ⚠ 无法创建通用链接: ${err.message}`);
   }
 }
 
