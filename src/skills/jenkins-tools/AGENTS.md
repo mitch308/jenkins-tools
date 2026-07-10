@@ -21,7 +21,8 @@
 ### 触发构建
 
 ```bash
-jkt build <任务名> -p key=value
+jkt build <任务名> -p key=value   # 直接传参构建
+jkt params <任务名> --json         # 查询参数定义（默认读本地缓存）
 ```
 
 ### 查询状态
@@ -34,6 +35,13 @@ jkt status [任务名] [--log]
 
 ```bash
 jkt abort [任务名] [-n 构建号]
+```
+
+### 版本更新
+
+```bash
+jkt update             # 检查并更新
+jkt update --check     # 仅检查
 ```
 
 ### 配置管理

@@ -30,6 +30,7 @@ jkt --job pc-dev       # 跳过任务选择
 直接触发构建：
 
 ```bash
+jkt build                       # 不传 job 时运行完整向导（等同 jkt）
 jkt build <任务> -p branch=main             # 直接传参（推荐，agent 环境）
 jkt build <任务> -p branch=main -p ENV=prod # 多个参数
 jkt build <任务>                            # 进入参数向导（仅 TTY 环境）
@@ -131,6 +132,15 @@ jkt config remove <profile>    # 移除服务器 Profile
 jkt config test                # 测试默认服务器连接
 jkt config test <profile>      # 测试指定服务器连接
 jkt config list                # 显示所有配置
+```
+
+### jkt update
+
+检查并更新 jkt：
+
+```bash
+jkt update             # 检查并更新到最新版本
+jkt update --check     # 仅检查是否有新版本，不执行更新
 ```
 
 ## 参数类型

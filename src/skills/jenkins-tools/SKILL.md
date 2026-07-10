@@ -106,7 +106,7 @@ jkt params <任务名> --sync    # 从远程同步参数（删除已移除的 ke
 jkt build <任务名> -p key1=value1 -p key2=value2
 ```
 
-**不要**运行不带 `-p` 的 `jkt build`（会进入交互式向导，在非 TTY 环境下卡住）。
+**不要**运行不带 `-p` 的 `jkt build <任务名>`（会进入交互式向导，在非 TTY 环境下卡住）。不传任务名时 `jkt build` 等同 `jkt`（运行完整向导）。
 
 #### 示例：agent 驱动的构建流程
 
@@ -365,7 +365,14 @@ Jenkins 是否已配置？ --> 否 --> 执行 jkt config init
     +-- "配置"/"设置"/"服务器" --> jkt config <子命令>
 ```
 
-**⚠️ 绝对不要**在 agent 环境中运行不带 `-p` 的 `jkt build`，会因非 TTY 导致卡住。
+**⚠️ 绝对不要**在 agent 环境中运行不带 `-p` 的 `jkt build <任务名>`，会因非 TTY 导致卡住。不传任务名时 `jkt build` 等同 `jkt`（运行完整向导）。
+
+## 版本更新
+
+```bash
+jkt update             # 检查并更新到最新版本
+jkt update --check     # 仅检查是否有新版本
+```
 
 ## 参数合并优先级
 
