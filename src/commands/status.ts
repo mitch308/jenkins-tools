@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { loadConfig } from '../config/loader.js';
 import { JenkinsService } from '../services/jenkins.js';
 import { getBuildRecords } from '../config/store.js';
-import { printSuccess, printError, printInfo, printWarning, spinner } from '../utils/output.js';
+import { printSuccess, printError, printInfo, printWarning, spinner, stripAuthFromUrl } from '../utils/output.js';
 import chalk from 'chalk';
 
 function formatDuration(ms: number): string {
@@ -45,7 +45,7 @@ export function registerStatusCommand(program: Command): void {
 }
 
 async function showRecentBuilds(): Promise<void> {
-  const records = getBuildRecords(20);
+  const records = getBuildRecords(10);
 
   if (records.length === 0) {
     printInfo('没有本工具触发的构建记录，请先运行 jkt 或 jkt build 触发构建');
@@ -60,43 +60,72 @@ async function showRecentBuilds(): Promise<void> {
     const r = records[i];
     const time = new Date(r.triggeredAt).toLocaleString('zh-CN');
 
-    // 尝试从 Jenkins 获取最新状态
-    let statusStr = chalk.gray('未知');
-    if (config) {
-      const profileName = r.server || config.servers.default;
-      const profile = config.servers.profiles[profileName];
-      if (profile) {
-        try {
-          const service = new JenkinsService(profile);
-          const lastBuild = await service.getLastBuildSummary(r.jobName);
-          if (lastBuild) {
-            if (lastBuild.building) {
-              statusStr = chalk.yellow(`⏳ #${lastBuild.number} 构建中`);
-            } else if (lastBuild.result === 'SUCCESS') {
-              statusStr = chalk.green(`✔ #${lastBuild.number} 成功`);
-            } else if (lastBuild.result === 'FAILURE') {
-              statusStr = chalk.red(`✖ #${lastBuild.number} 失败`);
-            } else if (lastBuild.result === 'ABORTED') {
-              statusStr = chalk.gray(`⊘ #${lastBuild.number} 中止`);
-            } else {
-              statusStr = chalk.blue(`ℹ #${lastBuild.number} ${lastBuild.result || '未知'}`);
-            }
-          }
-        } catch {
-          // ignore — show unknown
-        }
-      }
-    }
-
     // 构建参数摘要
     const paramStr = r.params
       ? Object.entries(r.params).map(([k, v]) => `${k}=${v}`).join(', ')
       : '';
 
+    // 无构建号（旧数据或推算失败）：不联网查询
+    if (!r.buildNumber) {
+      const statusStr = chalk.gray('未知构建号');
+      console.log(`  ${chalk.bold(`#${i + 1}`)}  ${chalk.cyan(r.jobName)}  ${statusStr}`);
+      console.log(`      ${chalk.gray(time)}${paramStr ? `  ${chalk.gray(paramStr)}` : ''}`);
+      if (r.queueUrl) {
+        console.log(`      ${chalk.blue(r.queueUrl)}`);
+      }
+      continue;
+    }
+
+    // 用记录自身的构建号查询真实状态
+    let statusStr = chalk.gray('未知');
+    let urlStr = r.queueUrl || '';
+    if (config) {
+      const profileName = r.server || config.servers.default;
+      const profile = config.servers.profiles[profileName];
+      if (profile) {
+        const service = new JenkinsService(profile);
+        const buildUrl = `${profile.url.replace(/\/+$/, '')}/job/${encodeURIComponent(r.jobName)}/${r.buildNumber}/`;
+        try {
+          const status = await service.getBuildStatus(r.jobName, r.buildNumber);
+          if (status.result === null && !status.building) {
+            statusStr = chalk.blue(`ℹ #${status.number} 待执行`);
+          } else if (status.building) {
+            statusStr = chalk.yellow(`⏳ #${status.number} 构建中`);
+          } else if (status.result === 'SUCCESS') {
+            statusStr = chalk.green(`✔ #${status.number} 成功`);
+          } else if (status.result === 'FAILURE') {
+            statusStr = chalk.red(`✖ #${status.number} 失败`);
+          } else if (status.result === 'ABORTED') {
+            statusStr = chalk.gray(`⊘ #${status.number} 中止`);
+          } else {
+            statusStr = chalk.blue(`ℹ #${status.number} ${status.result || '未知'}`);
+          }
+          // 已执行：显示构建地址
+          urlStr = stripAuthFromUrl(buildUrl);
+        } catch {
+          // Build API 不可访问，可能仍在排队中
+          try {
+            const queued = await service.findQueuedItem(r.jobName, r.buildNumber);
+            if (queued && !queued.cancelled) {
+              statusStr = chalk.magenta(`⏳ #${r.buildNumber} 排队中`);
+              if (queued.why) {
+                // 排队中：显示队列地址
+                urlStr = r.queueUrl ? stripAuthFromUrl(r.queueUrl) : urlStr;
+              }
+            } else {
+              statusStr = chalk.gray(`# ${r.buildNumber} 不存在或无法访问`);
+            }
+          } catch {
+            // ignore — show unknown
+          }
+        }
+      }
+    }
+
     console.log(`  ${chalk.bold(`#${i + 1}`)}  ${chalk.cyan(r.jobName)}  ${statusStr}`);
     console.log(`      ${chalk.gray(time)}${paramStr ? `  ${chalk.gray(paramStr)}` : ''}`);
-    if (r.queueUrl) {
-      console.log(`      ${chalk.blue(r.queueUrl)}`);
+    if (urlStr) {
+      console.log(`      ${chalk.blue(urlStr)}`);
     }
   }
   console.log();

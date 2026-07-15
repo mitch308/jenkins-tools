@@ -246,43 +246,81 @@ export class JenkinsService {
         ? result.headers.location[0]
         : '';
 
-    // Poll queue API to get build number (wait up to 10s)
+    // Immediately compute the build number from the queue position rather than
+    // polling for executable.number (which can take a long time when executors
+    // are busy). Falls back to the queue item's executable.number when the item
+    // has already been picked up, and to undefined when neither is available.
     let buildNumber: number | undefined;
     if (queueUrl) {
-      buildNumber = await this.waitForBuildNumber(queueUrl, 10000);
+      buildNumber = await this.computeBuildNumber(jobName, queueUrl);
     }
 
     return { queueUrl, buildNumber };
   }
 
   /**
-   * Wait for Jenkins queue to assign a build number.
-   * Polls the queue item API until executable.buildNumber appears.
+   * Compute the build number for a just-triggerd build using the queue
+   * position. Mirrors the assignment logic in findQueuedItem/getRecentBuilds:
+   * queue items that already have executable.number keep it; items without it
+   * are assigned sequentially starting from the job's nextBuildNumber.
+   *
+   * Returns the build number of the queue item matching `queueUrl`, or
+   * undefined if it can't be determined (item already consumed / API error).
    */
-  private async waitForBuildNumber(queueUrl: string, timeoutMs: number): Promise<number | undefined> {
-    // Convert queue URL to API URL: http://host/queue/item/123/ → http://host/queue/item/123/api/json
-    const apiUrl = queueUrl.replace(/\/$/, '') + '/api/json';
-    const deadline = Date.now() + timeoutMs;
-    const interval = 1000;
+  private async computeBuildNumber(jobName: string, queueUrl: string): Promise<number | undefined> {
+    try {
+      const [queueData, jobData] = await Promise.all([
+        this.getJson<any>('/queue/api/json?tree=items[id,task[name],executable[number],cancelled]'),
+        this.getJson<any>(`/job/${encodeURIComponent(jobName)}/api/json?tree=nextBuildNumber`),
+      ]);
 
-    while (Date.now() < deadline) {
-      try {
-        const data = await this.getJson<any>(apiUrl);
-        if (data?.executable?.number) {
-          return data.executable.number;
+      const nextBuildNumber = jobData.nextBuildNumber;
+      const items = queueData.items || [];
+
+      // Un-cancelled queued items for this job, in queue order
+      const jobItems = items.filter((item: any) => item.task?.name === jobName && !item.cancelled);
+
+      // Assign numbers: items with executable.number keep it; the rest are
+      // assigned sequentially from nextBuildNumber, skipping already-used ones.
+      const assignedNumbers = new Set<number>();
+      for (const item of jobItems) {
+        if (item.executable?.number) {
+          assignedNumbers.add(item.executable.number);
         }
-        // Still queued, wait and retry
-        if (data?.why) {
-          await new Promise((r) => setTimeout(r, interval));
-          continue;
-        }
-      } catch {
-        // Queue item might not be ready yet
       }
-      await new Promise((r) => setTimeout(r, interval));
-    }
+      let nextAssignable = nextBuildNumber;
+      for (const item of jobItems) {
+        if (!item.executable?.number) {
+          while (assignedNumbers.has(nextAssignable)) {
+            nextAssignable++;
+          }
+          item._assignedBuildNumber = nextAssignable;
+          assignedNumbers.add(nextAssignable);
+          nextAssignable++;
+        }
+      }
 
-    return undefined;
+      // Match the triggered item by its queue URL (ends with /queue/item/<id>/)
+      const idMatch = queueUrl.match(/queue\/item\/(\d+)/);
+      if (idMatch) {
+        const itemId = idMatch[1];
+        const matched = jobItems.find((item: any) => String(item.id) === itemId);
+        if (matched) {
+          return matched.executable?.number ?? matched._assignedBuildNumber;
+        }
+      }
+
+      // Item no longer in queue (already picked up): query it directly.
+      const apiUrl = queueUrl.replace(/\/$/, '') + '/api/json';
+      try {
+        const item = await this.getJson<any>(apiUrl);
+        return item?.executable?.number;
+      } catch {
+        return undefined;
+      }
+    } catch {
+      return undefined;
+    }
   }
 
   /**
