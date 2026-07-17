@@ -90,7 +90,8 @@ async function showRecentBuilds(): Promise<void> {
           if (status.result === null && !status.building) {
             statusStr = chalk.blue(`ℹ #${status.number} 待执行`);
           } else if (status.building) {
-            statusStr = chalk.yellow(`⏳ #${status.number} 构建中`);
+            const elapsed = formatDuration(Date.now() - status.timestamp);
+            statusStr = chalk.yellow(`⏳ #${status.number} 构建中 ${chalk.gray(`已耗时 ${elapsed}`)}`);
           } else if (status.result === 'SUCCESS') {
             statusStr = chalk.green(`✔ #${status.number} 成功`);
           } else if (status.result === 'FAILURE') {
@@ -170,7 +171,9 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
 
     for (const b of builds) {
       const time = new Date(b.timestamp).toLocaleString('zh-CN');
-      const duration = b.building ? '—' : formatDuration(b.duration);
+      const duration = b.building
+        ? `${formatDuration(Date.now() - b.timestamp)} (进行中)`
+        : formatDuration(b.duration);
 
       let statusIcon: string;
       let numberLabel: string;
@@ -287,7 +290,10 @@ async function showJobStatus(job: string, options: { number?: number; recent?: n
 
     console.log(`\n构建 #${status.number}  ${statusIcon}`);
     console.log(`URL: ${status.url}`);
-    console.log(`耗时: ${formatDuration(status.duration)}`);
+    const durationStr = status.building
+      ? `${formatDuration(Date.now() - status.timestamp)} (进行中)`
+      : formatDuration(status.duration);
+    console.log(`耗时: ${durationStr}`);
     if (status.userName) {
       console.log(`用户: ${chalk.cyan(`@${status.userName}`)}`);
     }

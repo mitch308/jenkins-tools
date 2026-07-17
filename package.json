@@ -1,6 +1,6 @@
 {
   "name": "jenkins-tools-cli",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Interactive Jenkins CLI tool with step-by-step build configuration",
   "type": "module",
   "bin": {
